@@ -2,7 +2,6 @@ server {
     listen 80;
     server_name localhost;
     
-    # Root directory for static files
     root /var/www/aos-collection;
     index index.html;
     
@@ -11,6 +10,10 @@ server {
     gzip_vary on;
     gzip_min_length 1024;
     gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+    
+    # Passwort-Schutz für die Website (NICHT für API)
+    auth_basic "AoS Collection - Anmeldung erforderlich";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     
     # Frontend - Serve React app
     location / {
@@ -22,8 +25,9 @@ server {
         rewrite ^.*$ /index.html last;
     }
     
-    # Backend API
+    # Backend API - OHNE Passwort-Schutz für interne Kommunikation
     location /api {
+        auth_basic off;  # API-Zugriff ohne Passwort
         proxy_pass http://localhost:3001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -41,8 +45,9 @@ server {
         client_max_body_size 100M;
     }
     
-    # Serve uploaded files
+    # Serve uploaded files - OHNE Passwort-Schutz für Downloads
     location /files {
+        auth_basic off;  # Datei-Downloads ohne Passwort
         alias /var/www/aos-collection/public/files;
         
         # Security: Only allow specific file types
@@ -63,8 +68,9 @@ server {
         add_header Cache-Control "public, immutable";
     }
     
-    # Health check endpoint
+    # Health check endpoint - OHNE Passwort-Schutz
     location /health {
+        auth_basic off;
         proxy_pass http://localhost:3001/api/health;
         access_log off;
     }
