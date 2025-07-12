@@ -18,6 +18,51 @@ if (!fs.existsSync(filesDir)) {
   fs.mkdirSync(filesDir, { recursive: true });
 }
 
+// Ensure data directory exists
+const dataDir = path.join(__dirname, '../data');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+const dataFile = path.join(dataDir, 'aos-data.json');
+
+// Data persistence endpoints
+app.get('/api/data', (req, res) => {
+  try {
+    if (fs.existsSync(dataFile)) {
+      const data = fs.readFileSync(dataFile, 'utf8');
+      res.json(JSON.parse(data));
+    } else {
+      res.status(404).json({ error: 'No data found' });
+    }
+  } catch (error) {
+    console.error('Error reading data:', error);
+    res.status(500).json({ error: 'Failed to read data' });
+  }
+});
+
+app.post('/api/data', (req, res) => {
+  try {
+    const data = req.body;
+    fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
+    res.json({ success: true, message: 'Data saved successfully' });
+  } catch (error) {
+    console.error('Error saving data:', error);
+    res.status(500).json({ error: 'Failed to save data' });
+  }
+});
+
+app.delete('/api/data', (req, res) => {
+  try {
+    if (fs.existsSync(dataFile)) {
+      fs.unlinkSync(dataFile);
+    }
+    res.json({ success: true, message: 'Data cleared successfully' });
+  } catch (error) {
+    console.error('Error clearing data:', error);
+    res.status(500).json({ error: 'Failed to clear data' });
+  }
+});
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
