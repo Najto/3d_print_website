@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "cd server && npm run dev",
-    "setup-server": "cd server && npm install"
+    "setup-server": "cd server && npm install",
+    "deploy": "sudo ./scripts/deploy.sh",
+    "setup-auth": "sudo ./scripts/setup-auth.sh"
   },
   "dependencies": {
     "lucide-react": "^0.344.0",
