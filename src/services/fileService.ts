@@ -1,5 +1,5 @@
 // File service for communicating with the backend
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = '/api';
 
 export interface UploadResponse {
   success: boolean;
@@ -116,7 +116,7 @@ class FileService {
   }
   
   getDownloadUrl(filePath: string): string {
-    return `http://localhost:3001/${filePath}`;
+    return `/${filePath}`;
   }
 }
 
