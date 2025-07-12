@@ -18,7 +18,7 @@ sudo apt-get install git
 ```bash
 # Projekt klonen
 git clone https://github.com/Najto/3d_print_website
-cd aos-collection
+cd 3d_print_website
 
 # Frontend Dependencies installieren
 npm install
