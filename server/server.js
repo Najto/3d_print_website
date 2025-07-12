@@ -3,7 +3,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
-const { authMiddleware, requireRole } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -11,15 +10,6 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Apply authentication to all routes except health check
-app.use('/api', (req, res, next) => {
-  if (req.path === '/health') {
-    return next();
-  }
-  authMiddleware(req, res, next);
-});
-
 app.use(express.static('public'));
 
 // Ensure files directory exists
@@ -83,7 +73,7 @@ const upload = multer({
 });
 
 // Upload endpoint for multiple files
-app.post('/api/upload', requireRole('admin'), upload.fields([
+app.post('/api/upload', upload.fields([
   { name: 'preview', maxCount: 1 },
   { name: 'stlFiles', maxCount: 20 }
 ]), (req, res) => {
@@ -189,7 +179,7 @@ app.get('/api/files/:allegiance/:faction/:unit', (req, res) => {
 });
 
 // Delete file endpoint
-app.delete('/api/files/:allegiance/:faction/:unit/:filename', requireRole('admin'), (req, res) => {
+app.delete('/api/files/:allegiance/:faction/:unit/:filename', (req, res) => {
   try {
     const { allegiance, faction, unit, filename } = req.params;
     
