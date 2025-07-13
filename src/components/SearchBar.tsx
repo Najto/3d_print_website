@@ -7,9 +7,13 @@ interface SearchBarProps {
   placeholder?: string;
 }
 
-export function SearchBar({ value, onChange, placeholder = "Suche nach Dateien..." }: SearchBarProps) {
+export function SearchBar({ value, onChange, placeholder = "Suche nach Einheiten..." }: SearchBarProps) {
   return (
     <div className="relative">
+      {/* Search Tips */}
+      <div className="mb-2 text-sm text-gray-400">
+        💡 Tipp: Verwende mehrere Stichwörter für präzisere Suche (z.B. "nurgle hero chaos")
+      </div>
       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
         <Search className="h-5 w-5 text-gray-400" />
       </div>

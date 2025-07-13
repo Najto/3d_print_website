@@ -34,13 +34,33 @@ function App() {
   };
 
   // Search functionality
-  const searchResults = searchTerm ? aosGameData.armies.flatMap(army => 
-    army.units.filter(unit =>
-      unit.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      unit.keywords.some(keyword => keyword.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      army.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  ) : [];
+  const searchResults = searchTerm ? aosGameData.armies.flatMap(army => {
+    // Split search term into individual keywords and clean them
+    const searchKeywords = searchTerm.toLowerCase()
+      .split(/\s+/)
+      .filter(keyword => keyword.length > 0);
+    
+    if (searchKeywords.length === 0) return [];
+    
+    return army.units.filter(unit => {
+      // Check if ALL search keywords match somewhere in the unit data
+      return searchKeywords.every(searchKeyword => {
+        const unitName = unit.name.toLowerCase();
+        const armyName = army.name.toLowerCase();
+        const unitKeywords = unit.keywords.map(k => k.toLowerCase());
+        const abilities = unit.abilities.map(ability => 
+          typeof ability === 'string' ? ability.toLowerCase() : ability.name.toLowerCase()
+        );
+        
+        // Check if the search keyword matches in any of these fields
+        return unitName.includes(searchKeyword) ||
+               armyName.includes(searchKeyword) ||
+               unitKeywords.some(keyword => keyword.includes(searchKeyword)) ||
+               abilities.some(ability => ability.includes(searchKeyword)) ||
+               unit.weapons.some(weapon => weapon.name.toLowerCase().includes(searchKeyword));
+      });
+    });
+  }) : [];
   
   const isSearchActive = searchTerm.length > 0;
 
