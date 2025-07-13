@@ -153,9 +153,6 @@ function App() {
                   )?.name
                 : 'Others'
               }
-                  )?.name
-                : 'Others'
-              }
             </button>
             <ChevronRight className="w-4 h-4 text-gray-600" />
             <span className="text-white font-medium">{currentItem.name}</span>
