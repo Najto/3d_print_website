@@ -14,7 +14,7 @@ import { useState } from 'react';
 import { cleanupOldFiles } from './utils/fileUtils';
 
 function App() {
-  const { gameData: aosGameData, updateUnit, deleteUnit } = useAoSData();
+  const { gameData: aosGameData, updateUnit, deleteUnit, scanFoldersForNewUnits, addScannedUnits } = useAoSData();
   const [selectedArmy, setSelectedArmy] = useState<string | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<AoSUnit | null>(null);
   const [editingUnit, setEditingUnit] = useState<AoSUnit | null>(null);
@@ -22,6 +22,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showOnlyDownloadable, setShowOnlyDownloadable] = useState(false);
   const [unitToDelete, setUnitToDelete] = useState<AoSUnit | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
   
   // Cleanup old files on app start
   React.useEffect(() => {
@@ -124,6 +125,26 @@ function App() {
   const handleCloseEditor = () => {
     setEditingUnit(null);
     setIsCreatingUnit(false);
+  };
+
+  const handleScanFolders = async () => {
+    if (!selectedArmy) return;
+    
+    setIsScanning(true);
+    try {
+      const newUnits = await scanFoldersForNewUnits(selectedArmy);
+      if (newUnits.length > 0) {
+        addScannedUnits(selectedArmy, newUnits);
+        alert(`${newUnits.length} neue Einheit${newUnits.length !== 1 ? 'en' : ''} aus Ordnern erstellt:\n${newUnits.map(u => `• ${u.name}`).join('\n')}`);
+      } else {
+        alert('Keine neuen Einheiten in Ordnern gefunden.');
+      }
+    } catch (error) {
+      console.error('Scan error:', error);
+      alert('Fehler beim Scannen der Ordner.');
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   return (
@@ -275,6 +296,18 @@ function App() {
                 >
                   <Plus className="w-4 h-4" />
                   <span>Neue Einheit</span>
+                </button>
+                <button
+                  onClick={handleScanFolders}
+                  disabled={isScanning}
+                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+                >
+                  {isScanning ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
+                  <span>{isScanning ? 'Scanne...' : 'Ordner scannen'}</span>
                 </button>
                 <button
                   onClick={() => setShowOnlyDownloadable(false)}

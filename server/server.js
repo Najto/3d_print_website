@@ -441,6 +441,144 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Auto-scan folders for new units
+app.get('/api/scan-folders/:armyId', (req, res) => {
+  try {
+    const { armyId } = req.params;
+    
+    // Get allegiance from army mapping
+    const allegianceMap = {
+      'stormcast-eternals': 'order',
+      'cities-of-sigmar': 'order',
+      'sylvaneth': 'order',
+      'lumineth-realm-lords': 'order',
+      'idoneth-deepkin': 'order',
+      'daughters-of-khaine': 'order',
+      'fyreslayers': 'order',
+      'kharadron-overlords': 'order',
+      'seraphon': 'order',
+      
+      'slaves-to-darkness': 'chaos',
+      'khorne-bloodbound': 'chaos',
+      'disciples-of-tzeentch': 'chaos',
+      'maggotkin-of-nurgle': 'chaos',
+      'hedonites-of-slaanesh': 'chaos',
+      'skaven': 'chaos',
+      'beasts-of-chaos': 'chaos',
+      
+      'nighthaunt': 'death',
+      'ossiarch-bonereapers': 'death',
+      'flesh-eater-courts': 'death',
+      'soulblight-gravelords': 'death',
+      
+      'orruk-warclans': 'destruction',
+      'gloomspite-gitz': 'destruction',
+      'sons-of-behemat': 'destruction',
+      'ogor-mawtribes': 'destruction',
+      
+      // Others categories
+      'endless-spells': 'others',
+      'buildings': 'others'
+    };
+    
+    const allegiance = allegianceMap[armyId];
+    if (!allegiance) {
+      return res.status(400).json({ error: 'Unknown army ID' });
+    }
+    
+    const sanitize = (str) => str.toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    
+    const armyFolderPath = path.join(filesDir, sanitize(allegiance), sanitize(armyId));
+    
+    if (!fs.existsSync(armyFolderPath)) {
+      return res.json({ newUnits: [] });
+    }
+    
+    const newUnits = [];
+    const folders = fs.readdirSync(armyFolderPath, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name);
+    
+    for (const folderName of folders) {
+      const unitFolderPath = path.join(armyFolderPath, folderName);
+      const files = fs.readdirSync(unitFolderPath);
+      
+      // Check if folder has any files
+      if (files.length === 0) continue;
+      
+      // Create unit name from folder name
+      const unitName = folderName
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      // Generate unit ID
+      const unitId = folderName;
+      
+      // Check for preview image
+      const previewImage = files.find(file => file.toLowerCase() === 'preview.jpg');
+      const previewPath = previewImage ? 
+        `files/${sanitize(allegiance)}/${sanitize(armyId)}/${folderName}/preview.jpg` : '';
+      
+      // Get STL and archive files
+      const stlFiles = files
+        .filter(file => {
+          const ext = path.extname(file).toLowerCase();
+          return ['.stl', '.zip', '.7z', '.rar', '.xz', '.gz'].includes(ext);
+        })
+        .map(fileName => {
+          const filePath = path.join(unitFolderPath, fileName);
+          const stats = fs.statSync(filePath);
+          return {
+            name: fileName,
+            size: `${(stats.size / (1024 * 1024)).toFixed(1)} MB`,
+            path: `files/${sanitize(allegiance)}/${sanitize(armyId)}/${folderName}/${fileName}`
+          };
+        });
+      
+      // Only create unit if it has STL files or preview image
+      if (stlFiles.length > 0 || previewImage) {
+        const newUnit = {
+          id: unitId,
+          name: unitName,
+          points: 0, // Default values - user can edit later
+          move: '6"',
+          health: 1,
+          save: '6+',
+          control: 1,
+          weapons: [],
+          abilities: [],
+          keywords: ['Infantry'], // Default keyword
+          unitSize: '1',
+          reinforcement: '',
+          notes: `Automatisch erstellt aus Ordner: ${folderName}`,
+          stlFiles: stlFiles,
+          previewImage: previewPath,
+          printNotes: stlFiles.length > 0 ? 'STL-Dateien aus Ordner-Scan verfügbar' : ''
+        };
+        
+        newUnits.push(newUnit);
+      }
+    }
+    
+    res.json({ 
+      newUnits,
+      scannedPath: armyFolderPath,
+      foundFolders: folders.length
+    });
+    
+  } catch (error) {
+    console.error('Folder scan error:', error);
+    res.status(500).json({ 
+      error: 'Fehler beim Scannen der Ordner',
+      details: error.message 
+    });
+  }
+});
+
 // Storage info endpoint
 app.get('/api/storage', (req, res) => {
   try {

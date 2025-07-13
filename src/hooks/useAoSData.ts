@@ -195,10 +195,62 @@ export function useAoSData() {
     setGameData(initialData);
   };
 
+  const scanFoldersForNewUnits = async (armyId: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/scan-folders/${armyId}`);
+      if (response.ok) {
+        const result = await response.json();
+        return result.newUnits || [];
+      }
+    } catch (error) {
+      console.error('Error scanning folders:', error);
+    }
+    return [];
+  };
+
+  const addScannedUnits = (armyId: string, newUnits: AoSUnit[]) => {
+    if (newUnits.length === 0) return;
+    
+    const newGameData = {
+      ...gameData,
+      armies: gameData.armies.map(army => {
+        if (army.id === armyId) {
+          // Filter out units that already exist
+          const existingUnitIds = army.units.map(u => u.id);
+          const unitsToAdd = newUnits.filter(unit => !existingUnitIds.includes(unit.id));
+          
+          return {
+            ...army,
+            units: [...army.units, ...unitsToAdd]
+          };
+        }
+        return army;
+      }),
+      otherCategories: gameData.otherCategories?.map(category => {
+        if (category.id === armyId) {
+          // Filter out units that already exist
+          const existingUnitIds = category.units.map(u => u.id);
+          const unitsToAdd = newUnits.filter(unit => !existingUnitIds.includes(unit.id));
+          
+          return {
+            ...category,
+            units: [...category.units, ...unitsToAdd]
+          };
+        }
+        return category;
+      }) || []
+    };
+    
+    setGameData(newGameData);
+    saveCustomData(newGameData);
+  };
+
   return {
     gameData,
     updateUnit,
     deleteUnit,
-    resetToDefault
+    resetToDefault,
+    scanFoldersForNewUnits,
+    addScannedUnits
   };
 }
