@@ -3,7 +3,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
-const compressionService = require('./services/compressionService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -129,7 +128,7 @@ const upload = multer({
 app.post('/api/upload', upload.fields([
   { name: 'preview', maxCount: 1 },
   { name: 'stlFiles', maxCount: 20 }
-]), async (req, res) => {
+]), (req, res) => {
   try {
     console.log('📤 Upload request received:', {
       body: req.body,
@@ -164,71 +163,15 @@ app.post('/api/upload', upload.fields([
 
     // Process STL files with compression
     if (req.files.stlFiles) {
-      console.log(`📁 Processing ${req.files.stlFiles.length} STL files...`);
+      console.log(`📁 Processing ${req.files.stlFiles.length} files...`);
       for (const file of req.files.stlFiles) {
-        console.log(`🔄 Processing file: ${file.filename} (${file.size} bytes)`);
-        const originalPath = file.path;
-        const originalSize = file.size;
-        const isAlreadyCompressed = /\.(xz|gz|zip|7z|rar)$/i.test(file.filename);
+        console.log(`📄 File uploaded: ${file.filename} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`);
         
-        if (isAlreadyCompressed) {
-          // File is already compressed - keep as is
-          console.log(`📦 Pre-compressed file detected: ${file.filename}`);
-          uploadedFiles.stlFiles.push({
-            name: file.filename,
-            compressedName: file.filename,
-            originalSize: `${(originalSize / (1024 * 1024)).toFixed(1)} MB`,
-            compressedSize: `${(originalSize / (1024 * 1024)).toFixed(1)} MB`,
-            compressionRatio: 'Pre-compressed',
-            path: `${folderPath}/${file.filename}`,
-            isCompressed: true,
-            preCompressed: true
-          });
-        } else {
-          // Try to compress uncompressed STL files
-          try {
-            console.log(`🗜️ Attempting compression for: ${file.filename}`);
-            // Compress STL file
-            const compressionResult = await compressionService.compressSTL(
-              originalPath,
-              path.join(path.dirname(originalPath), path.parse(file.filename).name)
-            );
-            
-            // Remove original uncompressed file only if compression was successful
-            if (compressionResult.compressedPath !== originalPath) {
-              fs.unlinkSync(originalPath);
-              console.log(`✅ Compression successful, original removed: ${file.filename}`);
-            } else {
-              console.log(`⚠️ Compression skipped, keeping original: ${file.filename}`);
-            }
-            
-            // Add compressed file info
-            uploadedFiles.stlFiles.push({
-              name: file.filename,
-              compressedName: path.basename(compressionResult.compressedPath),
-              originalSize: `${(originalSize / (1024 * 1024)).toFixed(1)} MB`,
-              compressedSize: `${(compressionResult.compressedSize / (1024 * 1024)).toFixed(1)} MB`,
-              compressionRatio: `${compressionResult.compressionRatio}%`,
-              path: `${folderPath}/${path.basename(compressionResult.compressedPath)}`,
-              isCompressed: true,
-              preCompressed: false
-            });
-            
-          } catch (compressionError) {
-            console.error('❌ Compression failed for', file.filename, '- keeping original:', compressionError.message);
-            
-            // Keep original file if compression fails
-            uploadedFiles.stlFiles.push({
-              name: file.filename,
-              originalSize: `${(originalSize / (1024 * 1024)).toFixed(1)} MB`,
-              compressedSize: `${(originalSize / (1024 * 1024)).toFixed(1)} MB`,
-              compressionRatio: '0%',
-              path: `${folderPath}/${file.filename}`,
-              isCompressed: false,
-              preCompressed: false
-            });
-          }
-        }
+        uploadedFiles.stlFiles.push({
+          name: file.filename,
+          size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+          path: `${folderPath}/${file.filename}`
+        });
       }
     }
 
@@ -241,7 +184,7 @@ app.post('/api/upload', upload.fields([
 
     res.json({
       success: true,
-      message: 'Dateien erfolgreich hochgeladen und komprimiert',
+      message: 'Dateien erfolgreich hochgeladen',
       files: uploadedFiles,
       folderPath: folderPath
     });
@@ -258,10 +201,10 @@ app.post('/api/upload', upload.fields([
   }
 });
 
-// Download endpoint with decompression
-app.get('/api/download/:allegiance/:faction/:unit/:filename/:compressed?', async (req, res) => {
+// Download endpoint
+app.get('/api/download/:allegiance/:faction/:unit/:filename', (req, res) => {
   try {
-    const { allegiance, faction, unit, filename, compressed } = req.params;
+    const { allegiance, faction, unit, filename } = req.params;
     
     const sanitize = (str) => str.toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
@@ -280,49 +223,10 @@ app.get('/api/download/:allegiance/:faction/:unit/:filename/:compressed?', async
       return res.status(404).json({ error: 'Datei nicht gefunden' });
     }
 
-    // Check if user wants compressed version or file should be decompressed
-    const wantsCompressed = compressed === 'compressed';
-    const isCompressedFile = /\.(xz|gz|zip|7z)$/i.test(filename);
-    
-    if (isCompressedFile && !wantsCompressed) {
-      // Decompress on-the-fly
-      const tempDir = path.join(__dirname, 'temp');
-      fs.mkdirSync(tempDir, { recursive: true });
-      
-      const originalFilename = filename.replace(/\.(xz|gz|zip|7z)$/i, '.stl');
-      const tempPath = path.join(tempDir, `${Date.now()}_${originalFilename}`);
-      
-      try {
-        if (filename.endsWith('.xz')) {
-          await compressionService.decompressSTL(filePath, tempPath);
-        } else {
-          // For other compression formats, copy as-is for now
-          // Could be extended with additional decompression methods
-          fs.copyFileSync(filePath, tempPath);
-        }
-        
-        res.setHeader('Content-Disposition', `attachment; filename="${originalFilename}"`);
-        res.setHeader('Content-Type', 'application/octet-stream');
-        
-        const stream = fs.createReadStream(tempPath);
-        stream.pipe(res);
-        
-        // Cleanup temp file after download
-        stream.on('end', () => {
-          setTimeout(() => {
-            compressionService.cleanupFiles([tempPath]);
-          }, 1000);
-        });
-        
-      } catch (decompressionError) {
-        console.error('Decompression failed:', decompressionError);
-        res.status(500).json({ error: 'Fehler beim Dekomprimieren der Datei' });
-      }
-    } else {
-      // Serve file directly (either uncompressed or user wants compressed version)
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.sendFile(filePath);
-    }
+    // Serve file directly
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.sendFile(filePath);
 
   } catch (error) {
     console.error('Download error:', error);
@@ -330,8 +234,8 @@ app.get('/api/download/:allegiance/:faction/:unit/:filename/:compressed?', async
   }
 });
 
-// Bulk download endpoint with compression
-app.get('/api/download-all/:allegiance/:faction/:unit', async (req, res) => {
+// Bulk download endpoint
+app.get('/api/download-all/:allegiance/:faction/:unit', (req, res) => {
   try {
     const { allegiance, faction, unit } = req.params;
     
@@ -352,42 +256,27 @@ app.get('/api/download-all/:allegiance/:faction/:unit', async (req, res) => {
     }
 
     const files = fs.readdirSync(folderPath);
-    const stlFiles = files.filter(file => file.endsWith('.stl') || file.endsWith('.xz'));
+    const stlFiles = files.filter(file => 
+      file.endsWith('.stl') || 
+      file.endsWith('.xz') || 
+      file.endsWith('.gz') || 
+      file.endsWith('.zip') || 
+      file.endsWith('.7z') || 
+      file.endsWith('.rar')
+    );
     
     if (stlFiles.length === 0) {
       return res.status(404).json({ error: 'Keine STL-Dateien gefunden' });
     }
 
-    // Create temporary archive
-    const tempDir = path.join(__dirname, 'temp');
-    fs.mkdirSync(tempDir, { recursive: true });
-    
-    const archiveName = `${sanitize(unit)}_stl_files.zip`;
-    const archivePath = path.join(tempDir, archiveName);
-    
-    // Prepare file paths for archiving
-    const filePaths = stlFiles.map(file => path.join(folderPath, file));
-    
-    try {
-      const archiveResult = await compressionService.createCompressedArchive(filePaths, archivePath);
-      
-      res.setHeader('Content-Disposition', `attachment; filename="${archiveName}"`);
-      res.setHeader('Content-Type', 'application/zip');
-      
-      const stream = fs.createReadStream(archivePath);
-      stream.pipe(res);
-      
-      // Cleanup temp file after download
-      stream.on('end', () => {
-        setTimeout(() => {
-          compressionService.cleanupFiles([archivePath]);
-        }, 1000);
-      });
-      
-    } catch (archiveError) {
-      console.error('Archive creation failed:', archiveError);
-      res.status(500).json({ error: 'Fehler beim Erstellen des Archivs' });
-    }
+    // For now, just return the first file or suggest individual downloads
+    res.json({
+      message: 'Bulk download not available. Please download files individually.',
+      files: stlFiles.map(file => ({
+        name: file,
+        downloadUrl: `/api/download/${allegiance}/${faction}/${unit}/${file}`
+      }))
+    });
 
   } catch (error) {
     console.error('Bulk download error:', error);
@@ -428,11 +317,9 @@ app.get('/api/files/:allegiance/:faction/:unit', (req, res) => {
       
       return {
         name: displayName,
-        actualName: filename,
         size: `${(stats.size / (1024 * 1024)).toFixed(1)} MB`,
         path: `files/${sanitize(allegiance)}/${sanitize(faction)}/${sanitize(unit)}/${filename}`,
-        isPreview: filename === 'preview.jpg',
-        isCompressed: isCompressed
+        isPreview: filename === 'preview.jpg'
       };
     });
 

@@ -226,29 +226,23 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
                     <div>
                       <div className="text-white font-medium">{file.name}</div>
                       <div className="text-gray-400 text-sm">
-                        {file.compressedSize || file.size}
-                        {file.isCompressed && (
-                          <span className="ml-2 text-green-400">
-                            📦 {file.preCompressed ? 'Pre-komprimiert' : `Komprimiert (${file.compressionRatio} gespart)`}
-                          </span>
-                        )}
+                        {file.size}
                         {file.variant && (
                           <span className="ml-2 text-green-400">({file.variant})</span>
                         )}
-                        {file.fileId && (
-                          <span className="ml-2 text-blue-400">📁 Hochgeladen</span>
+                        {file.path && (
+                          <span className="ml-2 text-blue-400">📁 Verfügbar</span>
                         )}
                       </div>
                     </div>
-                   <div className="flex space-x-1">
+                   <div>
                      <button 
                        onClick={() => {
-                         if (file.path || file.actualName) {
-                           const fileName = file.actualName || file.name;
-                           const downloadUrl = `/api/download/${getAllegianceFromArmy(armyId)}/${armyId}/${unit.name}/${fileName}`;
+                         if (file.path) {
+                           const downloadUrl = `/${file.path}`;
                            const link = document.createElement('a');
                            link.href = downloadUrl;
-                           link.download = file.name.replace(/\.(xz|gz|zip|7z)$/i, '.stl');
+                           link.download = file.name;
                            document.body.appendChild(link);
                            link.click();
                            document.body.removeChild(link);
@@ -257,31 +251,10 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
                          }
                        }}
                        className="bg-green-600 hover:bg-green-500 text-white p-2 rounded transition-colors"
-                       title="STL herunterladen (dekomprimiert)"
+                       title="Datei herunterladen"
                      >
                        <Download className="w-4 h-4" />
                      </button>
-                     {file.isCompressed && (
-                       <button 
-                         onClick={() => {
-                           if (file.path || file.actualName) {
-                             const fileName = file.actualName || file.name;
-                             const downloadUrl = `/api/download/${getAllegianceFromArmy(armyId)}/${armyId}/${unit.name}/${fileName}/compressed`;
-                             const link = document.createElement('a');
-                             link.href = downloadUrl;
-                             link.download = fileName;
-                             document.body.appendChild(link);
-                             link.click();
-                             document.body.removeChild(link);
-                           }
-                         }}
-                         className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded transition-colors"
-                         title="Komprimierte Datei herunterladen"
-                       >
-                         📦
-                       </button>
-                     )}
-                   </div>
                   </div>
                 ))}
               </div>
@@ -289,28 +262,10 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
               <div className="flex items-center justify-between">
                 <div className="text-gray-400 text-sm">
                   Gesamt: {totalSTLSize.toFixed(1)} MB
-                  {unit.stlFiles?.some(f => f.isCompressed) && (
-                    <span className="ml-2 text-green-400">
-                      💾 Speicher gespart durch Komprimierung
-                    </span>
-                  )}
                 </div>
-                <button 
-                  onClick={() => {
-                    // Download all files as compressed archive
-                    const downloadUrl = `/api/download-all/${getAllegianceFromArmy(armyId)}/${armyId}/${unit.name}`;
-                    const link = document.createElement('a');
-                    link.href = downloadUrl;
-                    link.download = `${unit.name}_stl_files.zip`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                  }}
-                  className="bg-green-600 hover:bg-green-500 text-white py-2 px-4 rounded-lg transition-colors flex items-center space-x-2"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Alle als ZIP herunterladen</span>
-                </button>
+                <div className="text-gray-500 text-sm">
+                  💡 Tipp: Laden Sie komprimierte Dateien (.xz, .zip, .7z) hoch um Speicherplatz zu sparen
+                </div>
               </div>
             </div>
           )}
