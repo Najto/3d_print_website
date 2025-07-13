@@ -178,9 +178,19 @@ fi
 print_status "Checking for local changes..."
 if ! git diff-index --quiet HEAD --; then
     print_warning "Local changes detected. Stashing them..."
-    git stash push -m "Auto-stash before update $(date)"
+    git stash push -m "Auto-stash before update $(date)" --include-untracked
     if [ $? -ne 0 ]; then
         print_error "Failed to stash local changes"
+        exit 1
+    fi
+fi
+
+# Also check for staged changes
+if ! git diff-index --quiet --cached HEAD --; then
+    print_warning "Staged changes detected. Stashing them..."
+    git stash push -m "Auto-stash staged changes before update $(date)" --include-untracked
+    if [ $? -ne 0 ]; then
+        print_error "Failed to stash staged changes"
         exit 1
     fi
 fi
@@ -188,10 +198,19 @@ fi
 # Pull latest changes
 print_status "Pulling latest changes from GitHub..."
 git fetch origin
-git reset --hard origin/main
+
+# Force update with proper conflict resolution
+git reset --hard HEAD
+git clean -fd
+git pull --rebase origin main
 if [ $? -ne 0 ]; then
-    print_error "Failed to pull latest changes"
-    exit 1
+    print_warning "Rebase failed, trying force reset..."
+    git fetch origin
+    git reset --hard origin/main
+    if [ $? -ne 0 ]; then
+        print_error "Failed to pull latest changes"
+        exit 1
+    fi
 fi
 
 # Rebuild frontend
