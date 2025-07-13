@@ -106,19 +106,21 @@ const upload = multer({
   },
   fileFilter: (req, file, cb) => {
     // Allow images and STL files
-    const allowedTypes = /jpeg|jpg|png|gif|webp|stl|xz|gz|zip|7z/;
+    const allowedTypes = /jpeg|jpg|png|gif|webp|stl|xz|gz|zip|7z|rar/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype) || 
                      file.mimetype === 'application/octet-stream' ||
                      file.mimetype === 'application/x-xz' ||
                      file.mimetype === 'application/gzip' ||
                      file.mimetype === 'application/zip' ||
-                     file.mimetype === 'application/x-7z-compressed';
+                     file.mimetype === 'application/x-7z-compressed' ||
+                     file.mimetype === 'application/x-rar-compressed' ||
+                     file.mimetype === 'application/vnd.rar';
     
     if (mimetype && extname) {
       return cb(null, true);
     } else {
-      cb(new Error('Nur Bilder (JPG, PNG, GIF, WebP), STL-Dateien und komprimierte Archive sind erlaubt!'));
+      cb(new Error(`Ungültiger Dateityp: ${file.mimetype}. Nur Bilder (JPG, PNG, GIF, WebP), STL-Dateien und komprimierte Archive (.stl, .xz, .gz, .zip, .7z, .rar) sind erlaubt!`));
     }
   }
 });
@@ -129,9 +131,15 @@ app.post('/api/upload', upload.fields([
   { name: 'stlFiles', maxCount: 20 }
 ]), async (req, res) => {
   try {
+    console.log('📤 Upload request received:', {
+      body: req.body,
+      files: req.files ? Object.keys(req.files) : 'no files'
+    });
+
     const { allegiance, faction, unit } = req.body;
     
     if (!allegiance || !faction || !unit) {
+      console.log('❌ Missing required fields:', { allegiance, faction, unit });
       return res.status(400).json({ 
         error: 'Allegiance, Faction und Unit sind erforderlich' 
       });
@@ -156,10 +164,12 @@ app.post('/api/upload', upload.fields([
 
     // Process STL files with compression
     if (req.files.stlFiles) {
+      console.log(`📁 Processing ${req.files.stlFiles.length} STL files...`);
       for (const file of req.files.stlFiles) {
+        console.log(`🔄 Processing file: ${file.filename} (${file.size} bytes)`);
         const originalPath = file.path;
         const originalSize = file.size;
-        const isAlreadyCompressed = /\.(xz|gz|zip|7z)$/i.test(file.filename);
+        const isAlreadyCompressed = /\.(xz|gz|zip|7z|rar)$/i.test(file.filename);
         
         if (isAlreadyCompressed) {
           // File is already compressed - keep as is
@@ -177,14 +187,20 @@ app.post('/api/upload', upload.fields([
         } else {
           // Try to compress uncompressed STL files
           try {
+            console.log(`🗜️ Attempting compression for: ${file.filename}`);
             // Compress STL file
             const compressionResult = await compressionService.compressSTL(
               originalPath,
               path.join(path.dirname(originalPath), path.parse(file.filename).name)
             );
             
-            // Remove original uncompressed file
-            fs.unlinkSync(originalPath);
+            // Remove original uncompressed file only if compression was successful
+            if (compressionResult.compressedPath !== originalPath) {
+              fs.unlinkSync(originalPath);
+              console.log(`✅ Compression successful, original removed: ${file.filename}`);
+            } else {
+              console.log(`⚠️ Compression skipped, keeping original: ${file.filename}`);
+            }
             
             // Add compressed file info
             uploadedFiles.stlFiles.push({
@@ -199,7 +215,7 @@ app.post('/api/upload', upload.fields([
             });
             
           } catch (compressionError) {
-            console.error('Compression failed for', file.filename, '- keeping original:', compressionError);
+            console.error('❌ Compression failed for', file.filename, '- keeping original:', compressionError.message);
             
             // Keep original file if compression fails
             uploadedFiles.stlFiles.push({
@@ -216,6 +232,13 @@ app.post('/api/upload', upload.fields([
       }
     }
 
+    console.log('✅ Upload processing completed successfully');
+    console.log('📋 Response data:', {
+      success: true,
+      filesCount: uploadedFiles.stlFiles.length,
+      folderPath: folderPath
+    });
+
     res.json({
       success: true,
       message: 'Dateien erfolgreich hochgeladen und komprimiert',
@@ -224,7 +247,10 @@ app.post('/api/upload', upload.fields([
     });
 
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('❌ Upload error:', error);
+    console.error('❌ Error stack:', error.stack);
+    
+    // Ensure we always send a JSON response
     res.status(500).json({ 
       error: 'Fehler beim Hochladen der Dateien',
       details: error.message 
