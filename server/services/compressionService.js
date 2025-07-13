@@ -1,13 +1,37 @@
-const lzma = require('lzma-native');
 const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
 const yauzl = require('yauzl');
 
+// Try to load lzma-native, fallback if not available (e.g., in Bolt.new)
+let lzma;
+let lzmaAvailable = false;
+
+try {
+  lzma = require('lzma-native');
+  lzmaAvailable = true;
+  console.log('✅ LZMA-native loaded successfully');
+} catch (error) {
+  console.warn('⚠️ LZMA-native not available, compression disabled:', error.message);
+  // Mock lzma object that throws errors when compression is attempted
+  lzma = {
+    compress: () => {
+      throw new Error('LZMA compression not available in this environment');
+    },
+    decompress: () => {
+      throw new Error('LZMA decompression not available in this environment');
+    },
+    PRESET_EXTREME: 9,
+    CHECK_CRC64: 4
+  };
+  lzmaAvailable = false;
+}
+
 class CompressionService {
   constructor() {
     this.compressionLevel = 9; // Maximum compression
     this.compressionPreset = lzma.PRESET_EXTREME;
+    this.lzmaAvailable = lzmaAvailable;
   }
 
   /**
@@ -18,6 +42,10 @@ class CompressionService {
    */
   async compressSTL(inputPath, outputPath) {
     try {
+      if (!this.lzmaAvailable) {
+        throw new Error('LZMA compression not available in this environment');
+      }
+      
       const originalStats = fs.statSync(inputPath);
       const originalSize = originalStats.size;
       
@@ -69,6 +97,10 @@ class CompressionService {
    */
   async decompressSTL(compressedPath, outputPath) {
     try {
+      if (!this.lzmaAvailable) {
+        throw new Error('LZMA decompression not available in this environment');
+      }
+      
       // Read compressed file
       const compressedData = fs.readFileSync(compressedPath);
       
@@ -206,7 +238,7 @@ class CompressionService {
     }
     
     const stats = fs.statSync(filePath);
-    const isCompressed = filePath.endsWith('.xz') || filePath.endsWith('.zip');
+    const isCompressed = this.lzmaAvailable && (filePath.endsWith('.xz') || filePath.endsWith('.zip'));
     
     return {
       path: filePath,
