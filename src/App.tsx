@@ -26,8 +26,7 @@ function App() {
   }, []);
   
   const currentArmy = selectedArmy ? aosGameData.armies.find(army => army.id === selectedArmy) : null;
-  const currentOtherCategory = selectedArmy ? aosGameData.otherCategories?.find(category => category.id === selectedArmy) : null;
-  const currentItem = currentArmy || currentOtherCategory;
+  const currentItem = currentArmy;
   
   // Filter units based on download availability
   const getFilteredUnits = (units: AoSUnit[]) => {
@@ -133,7 +132,7 @@ function App() {
         </div>
 
         {/* Breadcrumb Navigation */}
-        {!isSearchActive && currentItem && (
+        {!isSearchActive && currentArmy && (
           <nav className="flex items-center space-x-2 text-sm text-gray-400 mb-6">
             <button
               onClick={handleBackToHome}
@@ -147,14 +146,14 @@ function App() {
               className="hover:text-yellow-400 transition-colors"
             >
               {currentArmy 
-                ? Object.values(aosGameData.allegianceGroups).find(allegiance => 
+                allegiance.armies.includes(currentArmy.id)
                     allegiance.armies.includes(currentArmy.id)
                   )?.name
                 : 'Others'
               }
             </button>
             <ChevronRight className="w-4 h-4 text-gray-600" />
-            <span className="text-white font-medium">{currentItem.name}</span>
+            <span className="text-white font-medium">{currentArmy.name}</span>
           </nav>
         )}
 
@@ -239,7 +238,7 @@ function App() {
         )}
 
         {/* Units Grid */}
-        {!isSearchActive && currentItem && (
+        {!isSearchActive && currentArmy && (
           <div>
             {/* Filter Buttons */}
             <div className="flex items-center justify-between mb-6">
@@ -259,7 +258,7 @@ function App() {
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >
-                  Alle anzeigen ({currentItem.units.length})
+                  Alle anzeigen ({currentArmy.units.length})
                 </button>
                 <button
                   onClick={() => setShowOnlyDownloadable(true)}
@@ -269,14 +268,14 @@ function App() {
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >
-                  Nur herunterladbar ({currentItem.units.filter(unit => unit.stlFiles && unit.stlFiles.length > 0).length})
+                  Nur herunterladbar ({currentArmy.units.filter(unit => unit.stlFiles && unit.stlFiles.length > 0).length})
                 </button>
               </div>
             </div>
 
             {/* Units Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {getFilteredUnits(currentItem.units).map((unit) => (
+              {getFilteredUnits(currentArmy.units).map((unit) => (
                 <AoSUnitCard 
                   key={unit.id} 
                   unit={unit} 
@@ -287,7 +286,7 @@ function App() {
             </div>
 
             {/* No Results Message */}
-            {showOnlyDownloadable && getFilteredUnits(currentItem.units).length === 0 && (
+            {showOnlyDownloadable && getFilteredUnits(currentArmy.units).length === 0 && (
               <div className="text-center py-12">
                 <div className="text-gray-400 text-lg mb-2">
                   Keine herunterladbaren Einheiten verfügbar
