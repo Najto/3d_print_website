@@ -332,7 +332,7 @@ function App() {
         {!isSearchActive && currentItem && (
           <div>
             {/* Filter Buttons */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center flex-wrap: wrap justify-between mb-6">
               <div className="flex items-center flex-wrap: wrap space-x-4">
                 <button
                   onClick={handleCreateUnit}
