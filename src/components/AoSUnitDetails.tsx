@@ -235,26 +235,27 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
                         )}
                       </div>
                     </div>
-                   <div>
-                     <button 
-                       onClick={() => {
-                         if (file.path) {
-                           const downloadUrl = `/${file.path}`;
-                           const link = document.createElement('a');
-                           link.href = downloadUrl;
-                           link.download = file.name;
-                           document.body.appendChild(link);
-                           link.click();
-                           document.body.removeChild(link);
-                         } else {
-                           alert('Diese Datei ist nicht zum Download verfügbar.');
-                         }
-                       }}
-                       className="bg-green-600 hover:bg-green-500 text-white p-2 rounded transition-colors"
-                       title="Datei herunterladen"
-                     >
-                       <Download className="w-4 h-4" />
-                     </button>
+                    <div>
+                      <button 
+                        onClick={() => {
+                          if (file.path) {
+                            const downloadUrl = `/${file.path}`;
+                            const link = document.createElement('a');
+                            link.href = downloadUrl;
+                            link.download = file.name;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          } else {
+                            alert('Diese Datei ist nicht zum Download verfügbar.');
+                          }
+                        }}
+                        className="bg-green-600 hover:bg-green-500 text-white p-2 rounded transition-colors"
+                        title="Datei herunterladen"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
