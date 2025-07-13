@@ -269,19 +269,6 @@ function App() {
           </div>
         )}
 
-        {/* Search Results Grid */}
-        {isSearchActive && searchResults.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {searchResults.map((unit) => (
-              <AoSUnitCard 
-                key={unit.id} 
-                unit={unit} 
-                onViewDetails={handleUnitDetails}
-                onEdit={handleEditUnit}
-              />
-            ))}
-          </div>
-        )}
 
         {/* No Search Results */}
         {isSearchActive && searchResults.length === 0 && (
