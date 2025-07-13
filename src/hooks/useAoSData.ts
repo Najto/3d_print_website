@@ -52,17 +52,7 @@ export function useAoSData() {
           };
         }
         return army;
-      }),
-      otherCategories: initialData.otherCategories?.map(category => {
-        const customCategory = customData.otherCategories?.find((c: AoSArmy) => c.id === category.id);
-        if (customCategory) {
-          return {
-            ...category,
-            units: customCategory.units
-          };
-        }
-        return category;
-      }) || []
+      })
     };
   };
 
@@ -72,11 +62,7 @@ export function useAoSData() {
       armies: data.armies.map(army => ({
         id: army.id,
         units: army.units
-      })),
-      otherCategories: data.otherCategories?.map(category => ({
-        id: category.id,
-        units: category.units
-      })) || []
+      }))
     };
 
     // Save to server
@@ -132,29 +118,7 @@ export function useAoSData() {
           };
         }
         return army;
-      }),
-      otherCategories: gameData.otherCategories?.map(category => {
-        if (category.id === armyId) {
-          const existingUnitIndex = category.units.findIndex(u => u.id === unit.id);
-          let newUnits;
-          
-          if (existingUnitIndex >= 0) {
-            // Update existing unit
-            newUnits = category.units.map((u, index) => 
-              index === existingUnitIndex ? unit : u
-            );
-          } else {
-            // Add new unit
-            newUnits = [...category.units, unit];
-          }
-          
-          return {
-            ...category,
-            units: newUnits
-          };
-        }
-        return category;
-      }) || []
+      })
     };
     
     setGameData(newGameData);
@@ -172,16 +136,7 @@ export function useAoSData() {
           };
         }
         return army;
-      }),
-      otherCategories: gameData.otherCategories?.map(category => {
-        if (category.id === armyId) {
-          return {
-            ...category,
-            units: category.units.filter(u => u.id !== unitId)
-          };
-        }
-        return category;
-      }) || []
+      })
     };
     
     setGameData(newGameData);

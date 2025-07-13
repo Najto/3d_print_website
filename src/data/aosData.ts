@@ -4373,27 +4373,5 @@ export const aosGameData: AoSGameData = {
       category: "core"
     },
     {
-      name: "Impassable Terrain", 
-      description: "Cannot be moved through",
-      category: "core"
-    }
-  ],
-  otherCategories: [
-    {
-      id: 'endless-spells',
-      name: 'Endless Spells',
-      description: 'Magische Manifestationen und Zaubersprüche',
-      allegiance: 'Universal',
-      playstyle: 'Unterstützung durch mächtige Zauber',
-      units: []
-    },
-    {
-      id: 'buildings',
-      name: 'Buildings',
-      description: 'Gelände, Festungen und Strukturen',
-      allegiance: 'Universal',
-      playstyle: 'Strategische Geländevorteile',
-      units: []
-    }
-  ]
+  terrainRules: []
 };
