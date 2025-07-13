@@ -73,10 +73,14 @@ function App() {
 
   const handleArmyClick = (armyId: string) => {
     setSelectedArmy(armyId);
+    // Scroll to top when army is selected
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleBackToHome = () => {
     setSelectedArmy(null);
+    // Scroll to top when returning to home
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleUnitDetails = (unit: AoSUnit) => {
