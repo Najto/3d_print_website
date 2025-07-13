@@ -28,8 +28,6 @@ function App() {
   const currentArmy = selectedArmy ? aosGameData.armies.find(army => army.id === selectedArmy) : null;
   const currentOtherCategory = selectedArmy ? aosGameData.otherCategories?.find(category => category.id === selectedArmy) : null;
   const currentItem = currentArmy || currentOtherCategory;
-  const currentOtherCategory = selectedArmy ? aosGameData.otherCategories?.find(category => category.id === selectedArmy) : null;
-  const currentItem = currentArmy || currentOtherCategory;
   
   // Filter units based on download availability
   const getFilteredUnits = (units: AoSUnit[]) => {
