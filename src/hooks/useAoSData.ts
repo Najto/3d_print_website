@@ -303,7 +303,7 @@ export function useAoSData() {
     resetToDefault,
     scanFoldersForNewUnits,
     scanAllFoldersForNewUnits,
-    addScannedUnits
+    addScannedUnits,
     addAllScannedUnits
   };
 }
