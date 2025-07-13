@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, X, File, Image, FolderOpen, Info, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, X, File, Image, FolderOpen, Info, CheckCircle, AlertCircle, Clock, Zap } from 'lucide-react';
 import { fileService } from '../services/fileService';
 
 interface FileUploadProps {
@@ -32,6 +32,14 @@ export function FileUpload({
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [uploadMessage, setUploadMessage] = useState('');
+  const [uploadProgress, setUploadProgress] = useState({
+    loaded: 0,
+    total: 0,
+    percentage: 0,
+    speed: 0,
+    eta: 0,
+    startTime: 0
+  });
 
   const handleFileSelect = async (file: File) => {
     // Validate file type
@@ -65,6 +73,16 @@ export function FileUpload({
     setUploading(true);
     setUploadStatus('idle');
     setUploadMessage('');
+    
+    // Reset progress
+    setUploadProgress({
+      loaded: 0,
+      total: file.size,
+      percentage: 0,
+      speed: 0,
+      eta: 0,
+      startTime: Date.now()
+    });
 
     try {
       const uploadData = type === 'image' 
@@ -75,7 +93,30 @@ export function FileUpload({
         allegiance,
         faction,
         unit,
-        uploadData
+        uploadData,
+        (progressEvent) => {
+          const now = Date.now();
+          const elapsed = (now - uploadProgress.startTime) / 1000; // seconds
+          const loaded = progressEvent.loaded;
+          const total = progressEvent.total || file.size;
+          const percentage = Math.round((loaded / total) * 100);
+          
+          // Calculate speed (bytes per second)
+          const speed = elapsed > 0 ? loaded / elapsed : 0;
+          
+          // Calculate ETA (seconds)
+          const remaining = total - loaded;
+          const eta = speed > 0 ? remaining / speed : 0;
+          
+          setUploadProgress({
+            loaded,
+            total,
+            percentage,
+            speed,
+            eta,
+            startTime: uploadProgress.startTime
+          });
+        }
       );
 
       setUploadStatus('success');
@@ -98,6 +139,19 @@ export function FileUpload({
       console.error('Upload error details:', error);
     } finally {
       setUploading(false);
+      // Keep progress visible for a moment after completion
+      if (uploadProgress.percentage === 100) {
+        setTimeout(() => {
+          setUploadProgress({
+            loaded: 0,
+            total: 0,
+            percentage: 0,
+            speed: 0,
+            eta: 0,
+            startTime: 0
+          });
+        }, 2000);
+      }
     }
   };
 
@@ -136,7 +190,25 @@ export function FileUpload({
   const getDescription = () => {
     return type === 'image' 
       ? 'JPG, PNG oder GIF bis 10MB' 
-      : 'STL-Dateien oder komprimierte Archive (.stl, .xz, .gz, .zip, .7z, .rar) bis 1GB';
+      : 'STL-Dateien oder komprimierte Archive (.stl, .xz, .gz, .zip, .7z, .rar) bis 1GB - große Dateien werden mit Progress angezeigt';
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const formatSpeed = (bytesPerSecond: number): string => {
+    return formatFileSize(bytesPerSecond) + '/s';
+  };
+
+  const formatTime = (seconds: number): string => {
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 3600) return `${Math.round(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+    return `${Math.round(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`;
   };
 
   return (
@@ -170,6 +242,64 @@ export function FileUpload({
           }`}>
             {uploadMessage}
           </span>
+        </div>
+      )}
+      
+      {/* Upload Progress Bar */}
+      {uploading && uploadProgress.total > 0 && (
+        <div className="bg-gray-700 rounded-lg p-4 border border-blue-500">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-white font-medium">Upload läuft...</span>
+            <span className="text-blue-400 font-bold">{uploadProgress.percentage}%</span>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="w-full bg-gray-600 rounded-full h-3 mb-3 overflow-hidden">
+            <div 
+              className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-300 ease-out relative"
+              style={{ width: `${uploadProgress.percentage}%` }}
+            >
+              {/* Animated shine effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-pulse"></div>
+            </div>
+          </div>
+          
+          {/* Upload Statistics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+            {/* File Size Progress */}
+            <div className="flex items-center space-x-2 text-gray-300">
+              <File className="w-4 h-4 text-blue-400" />
+              <span>
+                {formatFileSize(uploadProgress.loaded)} / {formatFileSize(uploadProgress.total)}
+              </span>
+            </div>
+            
+            {/* Upload Speed */}
+            <div className="flex items-center space-x-2 text-gray-300">
+              <Zap className="w-4 h-4 text-green-400" />
+              <span>
+                {uploadProgress.speed > 0 ? formatSpeed(uploadProgress.speed) : 'Berechne...'}
+              </span>
+            </div>
+            
+            {/* Estimated Time */}
+            <div className="flex items-center space-x-2 text-gray-300">
+              <Clock className="w-4 h-4 text-yellow-400" />
+              <span>
+                {uploadProgress.eta > 0 && uploadProgress.eta < Infinity 
+                  ? `noch ${formatTime(uploadProgress.eta)}`
+                  : 'Berechne...'
+                }
+              </span>
+            </div>
+          </div>
+          
+          {/* Large File Notice */}
+          {uploadProgress.total > 100 * 1024 * 1024 && (
+            <div className="mt-3 p-2 bg-yellow-900 border border-yellow-700 rounded text-yellow-300 text-xs">
+              💡 Große Datei erkannt - bitte Verbindung stabil halten
+            </div>
+          )}
         </div>
       )}
       

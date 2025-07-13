@@ -35,7 +35,8 @@ class FileService {
     files: {
       preview?: File;
       stlFiles?: File[];
-    }
+    },
+    onProgress?: (progressEvent: { loaded: number; total?: number }) => void
   ): Promise<UploadResponse> {
     const formData = new FormData();
     
@@ -56,10 +57,62 @@ class FileService {
       });
     }
     
+    // Calculate total size for progress
+    let totalSize = 0;
+    if (files.preview) totalSize += files.preview.size;
+    if (files.stlFiles) {
+      files.stlFiles.forEach(file => totalSize += file.size);
+    }
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/upload`, {
-        method: 'POST',
-        body: formData,
+      // Use XMLHttpRequest for progress tracking
+      const response = await new Promise<Response>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        // Track upload progress
+        if (onProgress) {
+          xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+              onProgress({
+                loaded: event.loaded,
+                total: event.total || totalSize
+              });
+            }
+          });
+        }
+        
+        // Handle completion
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            // Create a Response-like object
+            const response = new Response(xhr.responseText, {
+              status: xhr.status,
+              statusText: xhr.statusText,
+              headers: new Headers({
+                'Content-Type': xhr.getResponseHeader('Content-Type') || 'application/json'
+              })
+            });
+            resolve(response);
+          } else {
+            reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+          }
+        });
+        
+        // Handle errors
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error occurred'));
+        });
+        
+        xhr.addEventListener('timeout', () => {
+          reject(new Error('Upload timeout'));
+        });
+        
+        // Configure request
+        xhr.open('POST', `${API_BASE_URL}/upload`);
+        xhr.timeout = 300000; // 5 minutes timeout
+        
+        // Send request
+        xhr.send(formData);
       });
       
       // Check if response is actually JSON
