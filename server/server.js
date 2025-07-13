@@ -441,6 +441,110 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Storage info endpoint
+app.get('/api/storage', (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Get disk usage for the files directory
+    const filesDir = path.join(__dirname, '../public/files');
+    const dataDir = path.join(__dirname, '../data');
+    
+    // Calculate used space by uploaded files
+    const calculateDirectorySize = (dirPath) => {
+      if (!fs.existsSync(dirPath)) return 0;
+      
+      let totalSize = 0;
+      const files = fs.readdirSync(dirPath, { withFileTypes: true });
+      
+      for (const file of files) {
+        const filePath = path.join(dirPath, file.name);
+        if (file.isDirectory()) {
+          totalSize += calculateDirectorySize(filePath);
+        } else {
+          const stats = fs.statSync(filePath);
+          totalSize += stats.size;
+        }
+      }
+      return totalSize;
+    };
+    
+    // Calculate sizes
+    const uploadedFilesSize = calculateDirectorySize(filesDir);
+    const dataSize = calculateDirectorySize(dataDir);
+    const totalUsed = uploadedFilesSize + dataSize;
+    
+    // Get system disk usage (Linux/Unix)
+    const { execSync } = require('child_process');
+    let diskInfo = { total: 0, available: 0, used: 0 };
+    
+    try {
+      // Get disk usage for the current directory
+      const dfOutput = execSync('df -B1 .', { encoding: 'utf8' });
+      const lines = dfOutput.trim().split('\n');
+      if (lines.length > 1) {
+        const parts = lines[1].split(/\s+/);
+        diskInfo = {
+          total: parseInt(parts[1]) || 0,
+          used: parseInt(parts[2]) || 0,
+          available: parseInt(parts[3]) || 0
+        };
+      }
+    } catch (error) {
+      console.warn('Could not get disk usage:', error.message);
+    }
+    
+    // Count files
+    const countFiles = (dirPath, extensions = []) => {
+      if (!fs.existsSync(dirPath)) return 0;
+      
+      let count = 0;
+      const files = fs.readdirSync(dirPath, { withFileTypes: true });
+      
+      for (const file of files) {
+        const filePath = path.join(dirPath, file.name);
+        if (file.isDirectory()) {
+          count += countFiles(filePath, extensions);
+        } else if (extensions.length === 0 || extensions.some(ext => file.name.toLowerCase().endsWith(ext))) {
+          count++;
+        }
+      }
+      return count;
+    };
+    
+    const stlCount = countFiles(filesDir, ['.stl', '.zip', '.7z', '.rar', '.xz', '.gz']);
+    const imageCount = countFiles(filesDir, ['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+    const totalFiles = countFiles(filesDir);
+    
+    res.json({
+      storage: {
+        disk: {
+          total: diskInfo.total,
+          used: diskInfo.used,
+          available: diskInfo.available,
+          usedPercentage: diskInfo.total > 0 ? Math.round((diskInfo.used / diskInfo.total) * 100) : 0
+        },
+        uploads: {
+          totalSize: totalUsed,
+          filesSize: uploadedFilesSize,
+          dataSize: dataSize,
+          stlFiles: stlCount,
+          imageFiles: imageCount,
+          totalFiles: totalFiles
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Storage info error:', error);
+    res.status(500).json({ 
+      error: 'Fehler beim Abrufen der Speicherinformationen',
+      details: error.message 
+    });
+  }
+});
 // Error handling middleware
 app.use((error, req, res, next) => {
   console.error('🚨 === MIDDLEWARE ERROR ===');

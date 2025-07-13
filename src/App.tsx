@@ -7,6 +7,7 @@ import { AoSUnitDetails } from './components/AoSUnitDetails';
 import { AoSUnitEditor } from './components/AoSUnitEditor';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { SearchBar } from './components/SearchBar';
+import { StorageDisplay } from './components/StorageDisplay';
 import { useAoSData } from './hooks/useAoSData';
 import { AoSUnit } from './types/AoSCollection';
 import { useState } from 'react';
@@ -384,6 +385,11 @@ function App() {
       {/* Footer */}
       <footer className="bg-gray-800 border-t border-gray-700 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {/* Storage Display */}
+          <div className="mb-6">
+            <StorageDisplay />
+          </div>
+          
           <div className="flex items-center justify-between">
             <p className="text-gray-400 text-sm">
               © 2025 Warhammer Age of Sigmar Collection. 4. Edition Regeln und 3D-Druckdateien.
