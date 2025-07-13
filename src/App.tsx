@@ -36,7 +36,6 @@ function App() {
   };
 
   // Search functionality
-  const searchResults = searchTerm ? aosGameData.armies.flatMap(army => {
   const searchResults = searchTerm ? [
     ...aosGameData.armies,
     ...(aosGameData.otherCategories || [])
@@ -315,7 +314,6 @@ function App() {
             ))}
           </div>
         )}
-
 
         {/* No Search Results */}
         {isSearchActive && searchResults.length === 0 && (
