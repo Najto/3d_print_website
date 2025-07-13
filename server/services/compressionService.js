@@ -43,7 +43,15 @@ class CompressionService {
   async compressSTL(inputPath, outputPath) {
     try {
       if (!this.lzmaAvailable) {
-        throw new Error('LZMA compression not available in this environment');
+        console.warn('⚠️ LZMA compression not available, keeping original file');
+        // Return mock result indicating no compression
+        const originalStats = fs.statSync(inputPath);
+        return {
+          compressedPath: inputPath, // Keep original path
+          originalSize: originalStats.size,
+          compressedSize: originalStats.size,
+          compressionRatio: 0
+        };
       }
       
       const originalStats = fs.statSync(inputPath);
@@ -56,13 +64,22 @@ class CompressionService {
       
       // Compress with LZMA2
       const compressedData = await new Promise((resolve, reject) => {
-        lzma.compress(inputData, {
-          preset: this.compressionPreset,
-          check: lzma.CHECK_CRC64
-        }, (err, result) => {
-          if (err) reject(err);
-          else resolve(result);
-        });
+        try {
+          lzma.compress(inputData, {
+            preset: this.compressionPreset,
+            check: lzma.CHECK_CRC64
+          }, (err, result) => {
+            if (err) {
+              console.error('❌ LZMA compression error:', err.message);
+              reject(err);
+            } else {
+              resolve(result);
+            }
+          });
+        } catch (syncError) {
+          console.error('❌ LZMA compression sync error:', syncError.message);
+          reject(syncError);
+        }
       });
       
       // Write compressed file
@@ -84,8 +101,16 @@ class CompressionService {
       };
       
     } catch (error) {
-      console.error('❌ Compression failed:', error);
-      throw error;
+      console.error('❌ Compression failed for', path.basename(inputPath), '- keeping original:', error.message);
+      
+      // Fallback: Keep original file without compression
+      const originalStats = fs.statSync(inputPath);
+      return {
+        compressedPath: inputPath, // Keep original path
+        originalSize: originalStats.size,
+        compressedSize: originalStats.size,
+        compressionRatio: 0
+      };
     }
   }
 
