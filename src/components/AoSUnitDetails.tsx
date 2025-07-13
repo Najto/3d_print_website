@@ -263,10 +263,28 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
               <div className="flex items-center justify-between">
                 <div className="text-gray-400 text-sm">
                   Gesamt: {totalSTLSize.toFixed(1)} MB
+                  {unit.stlFiles?.some(f => f.isCompressed) && (
+                    <span className="ml-2 text-green-400">
+                      💾 Speicher gespart durch Komprimierung
+                    </span>
+                  )}
                 </div>
-                <div className="text-gray-500 text-sm">
-                  💡 Tipp: Laden Sie komprimierte Dateien (.xz, .zip, .7z) hoch um Speicherplatz zu sparen
-                </div>
+                <button 
+                  onClick={() => {
+                    // Download all files as compressed archive
+                    const downloadUrl = `/api/download-all/${getAllegianceFromArmy(armyId)}/${armyId}/${unit.name}`;
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.download = `${unit.name}_stl_files.zip`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="bg-green-600 hover:bg-green-500 text-white py-2 px-4 rounded-lg transition-colors flex items-center space-x-2"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Alle als ZIP herunterladen</span>
+                </button>
               </div>
             </div>
           )}
