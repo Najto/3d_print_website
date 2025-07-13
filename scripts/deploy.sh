@@ -121,27 +121,164 @@ cat > $NGINX_DIR/update.sh << 'EOF'
 #!/bin/bash
 echo "🔄 Updating AoS Collection..."
 
-# Pull latest changes
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_status() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    print_error "Please run as root (use sudo)"
+    exit 1
+fi
+
+# Backup current data before update
+print_status "Creating backup before update..."
+BACKUP_DIR="/home/pi/backups/aos-collection"
+DATE=$(date +%Y%m%d_%H%M%S)
+mkdir -p $BACKUP_DIR
+
+# Backup data and files
+if [ -d "/var/www/aos-collection/data" ]; then
+    cp -r /var/www/aos-collection/data $BACKUP_DIR/data_backup_$DATE
+    print_status "Data backed up to: $BACKUP_DIR/data_backup_$DATE"
+fi
+
+if [ -d "/var/www/aos-collection/public/files" ]; then
+    tar -czf $BACKUP_DIR/files_backup_$DATE.tar.gz /var/www/aos-collection/public/files
+    print_status "Files backed up to: $BACKUP_DIR/files_backup_$DATE.tar.gz"
+fi
+
+# Navigate to source directory
 cd /home/pi/3d_print_website
-git pull origin main
+
+# Check if directory exists
+if [ ! -d "/home/pi/3d_print_website" ]; then
+    print_error "Source directory not found: /home/pi/3d_print_website"
+    print_error "Please clone the repository first:"
+    print_error "cd /home/pi && git clone https://github.com/Najto/3d_print_website"
+    exit 1
+fi
+
+# Handle git conflicts gracefully
+print_status "Checking for local changes..."
+if ! git diff-index --quiet HEAD --; then
+    print_warning "Local changes detected. Stashing them..."
+    git stash push -m "Auto-stash before update $(date)"
+    if [ $? -ne 0 ]; then
+        print_error "Failed to stash local changes"
+        exit 1
+    fi
+fi
+
+# Pull latest changes
+print_status "Pulling latest changes from GitHub..."
+git fetch origin
+git reset --hard origin/main
+if [ $? -ne 0 ]; then
+    print_error "Failed to pull latest changes"
+    exit 1
+fi
 
 # Rebuild frontend
+print_status "Installing dependencies..."
 npm install
+if [ $? -ne 0 ]; then
+    print_error "Failed to install npm dependencies"
+    exit 1
+fi
+
+print_status "Building frontend..."
 npm run build
+if [ $? -ne 0 ]; then
+    print_error "Failed to build frontend"
+    exit 1
+fi
 
 # Copy new files
-sudo cp -r dist/* /var/www/aos-collection/
-sudo cp -r server/* /var/www/aos-collection/server/
+print_status "Deploying frontend..."
+cp -r dist/* /var/www/aos-collection/
+if [ $? -ne 0 ]; then
+    print_error "Failed to copy frontend files"
+    exit 1
+fi
+
+print_status "Deploying backend..."
+cp -r server/* /var/www/aos-collection/server/
+if [ $? -ne 0 ]; then
+    print_error "Failed to copy backend files"
+    exit 1
+fi
 
 # Update backend dependencies
+print_status "Updating backend dependencies..."
 cd /var/www/aos-collection/server
-sudo npm install
+npm install
+if [ $? -ne 0 ]; then
+    print_error "Failed to install backend dependencies"
+    exit 1
+fi
+
+# Set proper permissions
+print_status "Setting permissions..."
+chown -R www-data:www-data /var/www/aos-collection
+chmod -R 755 /var/www/aos-collection
+chmod -R 777 /var/www/aos-collection/public/files
+chmod -R 777 /var/www/aos-collection/data
 
 # Restart services
-sudo pm2 restart aos-backend
-sudo systemctl reload nginx
+print_status "Restarting services..."
+pm2 restart aos-backend
+if [ $? -ne 0 ]; then
+    print_warning "Failed to restart PM2 service"
+fi
 
-echo "✅ Update complete!"
+systemctl reload nginx
+if [ $? -ne 0 ]; then
+    print_warning "Failed to reload Nginx"
+fi
+
+# Verify services are running
+print_status "Verifying services..."
+sleep 2
+
+# Test API
+if curl -s http://localhost:3001/api/health > /dev/null; then
+    print_status "✅ Backend API is responding"
+else
+    print_error "❌ Backend API is not responding"
+fi
+
+# Test Nginx
+if curl -s http://localhost/api/health > /dev/null; then
+    print_status "✅ Nginx proxy is working"
+else
+    print_error "❌ Nginx proxy is not working"
+fi
+
+print_status "🎉 Update completed successfully!"
+print_status "📁 Backup location: $BACKUP_DIR"
+print_status "🌐 Website: http://$(hostname -I | awk '{print $1}')/"
+print_status ""
+print_status "📋 If you encounter issues:"
+print_status "  Check logs: pm2 logs aos-backend"
+print_status "  Check status: pm2 status"
+print_status "  Restore backup: cp -r $BACKUP_DIR/data_backup_$DATE/* /var/www/aos-collection/data/"
+
 EOF
 
 chmod +x $NGINX_DIR/update.sh
