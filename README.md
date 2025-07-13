@@ -125,7 +125,16 @@ Die Dateien werden automatisch in folgender Struktur gespeichert:
 │   │   │   └── great-unclean-one/
 │   │   └── slaves-to-darkness/
 │   ├── death/
-│   └── destruction/
+│   ├── destruction/
+│   └── others/
+│       ├── endless-spells/
+│       │   ├── purple-sun/
+│       │   │   ├── preview.jpg
+│       │   │   └── purple_sun.stl
+│       │   └── malevolent-maelstrom/
+│       └── buildings/
+│           ├── fortress-of-redemption/
+│           └── arcane-ruins/
 ├── data/
 │   └── aos-data.json          # Einheiten-Daten (persistent)
 ├── dist/                      # Frontend (React Build)
@@ -148,8 +157,22 @@ Die Dateien werden automatisch in folgender Struktur gespeichert:
 ### 📱 Benutzerfreundlich
 - **Responsive Design** - Funktioniert auf Desktop, Tablet und Handy
 - **Live-Feedback** - Sofortige Bestätigung bei erfolgreichem Upload
-- **Suchfunktion** - Durchsuche alle Einheiten und Armeen
+- **Suchfunktion** - Durchsuche alle Einheiten und Armeen mit mehreren Stichwörtern
 - **Filter-Optionen** - Zeige nur Einheiten mit STL-Dateien
+- **Sticky Navigation** - Breadcrumb-Menü bleibt beim Scrollen sichtbar
+- **Auto-Scroll** - Automatisches Scrollen nach oben bei Navigation
+
+### 🏛️ Vollständige AoS 4. Edition Struktur
+- **4 Hauptfraktionen**: Order, Chaos, Death, Destruction
+- **20+ Armeen**: Alle aktuellen AoS-Armeen der 4. Edition
+- **Others Kategorie**: Endless Spells und Buildings
+- **Detaillierte Einheiten**: Stats, Waffen, Fähigkeiten, Schlüsselwörter
+
+### 🛡️ Sichere Einheiten-Verwaltung
+- **CRUD-Operationen** - Erstellen, Anzeigen, Bearbeiten, Löschen
+- **Sicherheitsabfrage** - 5-Sekunden-Verzögerung beim Löschen
+- **Datei-Schutz** - STL-Dateien bleiben beim Löschen erhalten
+- **Detailansicht** - Vollständige Einheiten-Informationen
 
 ### 🔧 Technische Details
 - **Node.js Backend** mit Express und Multer
@@ -217,6 +240,7 @@ curl http://localhost/api/data
 - **Datei-Validierung** - Nur erlaubte Dateitypen (Bilder, STL)
 - **Größenbegrenzung** - Maximum 100MB pro Datei
 - **Sichere Ordner-Namen** - Automatische Bereinigung von Sonderzeichen
+- **Lösch-Schutz** - 5-Sekunden-Verzögerung mit Sicherheitsabfrage
 
 ## 📋 Troubleshooting
 
@@ -270,14 +294,42 @@ sudo cp -r ~/backup-files-YYYYMMDD/* /var/www/aos-collection/public/files/
 
 ## 🎮 Verwendung
 
-1. **Website öffnen** - http://IHRE_RASPBERRY_PI_IP/
-2. **Anmelden** - Mit Ihrem konfigurierten Passwort
-3. **Armee wählen** - Z.B. "Stormcast Eternals"
-4. **Neue Einheit erstellen** - Klicken Sie auf "Neue Einheit"
-5. **Grunddaten eingeben** - Name, Punkte, Stats, Waffen, etc.
-6. **Dateien hochladen** - Drag & Drop für Vorschaubild und STL-Dateien
-7. **Speichern** - Einheit wird permanent gespeichert
-8. **Verwalten** - Bearbeiten, Anzeigen, Herunterladen
+### 1. **Website öffnen** 
+- Navigieren Sie zu http://IHRE_RASPBERRY_PI_IP/
+- Melden Sie sich mit Ihrem konfigurierten Passwort an
+
+### 2. **Hauptfraktionen durchsuchen**
+- **Order** - Stormcast Eternals, Cities of Sigmar, Sylvaneth, etc.
+- **Chaos** - Maggotkin of Nurgle, Slaves to Darkness, Skaven, etc.
+- **Death** - Nighthaunt, Ossiarch Bonereapers, etc.
+- **Destruction** - Orruk Warclans, Gloomspite Gitz, etc.
+
+### 3. **Others Kategorie nutzen**
+- **Endless Spells** - Magische Manifestationen und Zaubersprüche
+- **Buildings** - Gelände, Festungen und Strukturen
+
+### 4. **Einheiten verwalten**
+- **Armee wählen** → Automatisches Scrollen nach oben
+- **"Neue Einheit"** → Vollständiger Editor mit allen AoS-Feldern
+- **Einheit anklicken** → Detailansicht mit allen Informationen
+- **"Bearbeiten"** → Alle Daten und Dateien ändern
+- **"Löschen"** → Sicherheitsabfrage mit 5-Sekunden-Verzögerung
+
+### 5. **Dateien hochladen**
+- **Drag & Drop** für Vorschaubilder und STL-Dateien
+- **Automatische Ordner-Struktur** basierend auf Fraktion/Einheit
+- **Live-Upload-Status** mit Erfolgs-/Fehlermeldungen
+- **Datei-Verwaltung** in der Detailansicht
+
+### 6. **Suchen und Filtern**
+- **Multi-Keyword-Suche** - "nurgle hero chaos" findet alle passenden Einheiten
+- **Filter nach STL-Verfügbarkeit** - Nur Einheiten mit 3D-Dateien anzeigen
+- **Durchsucht alle Bereiche** - Armeen, Endless Spells, Buildings
+
+### 7. **Navigation**
+- **Sticky Breadcrumb** - Bleibt beim Scrollen sichtbar
+- **Auto-Scroll** - Springt bei Navigation automatisch nach oben
+- **Zurück-Navigation** - Jederzeit zur Hauptseite
 
 ## 🔄 Daten-Persistierung
 
@@ -285,11 +337,14 @@ sudo cp -r ~/backup-files-YYYYMMDD/* /var/www/aos-collection/public/files/
 - ✅ **Einheiten-Daten** → `/var/www/aos-collection/data/aos-data.json`
 - ✅ **STL-Dateien** → `/var/www/aos-collection/public/files/`
 - ✅ **Vorschaubilder** → `/var/www/aos-collection/public/files/`
+- ✅ **Endless Spells** → Vollständig integriert
+- ✅ **Buildings** → Vollständig integriert
 
 ### Was bleibt bei Updates erhalten:
 - ✅ **Alle Ihre Einheiten** - Werden nicht überschrieben
 - ✅ **Alle hochgeladenen Dateien** - Bleiben bestehen
 - ✅ **Nginx-Konfiguration** - Bleibt unverändert
+- ✅ **Others-Kategorie** - Endless Spells & Buildings
 - 🔄 **Frontend-Code** - Wird aktualisiert
 - 🔄 **Backend-Code** - Wird aktualisiert
 
@@ -307,6 +362,15 @@ sudo cp -r ~/backup-files-YYYYMMDD/* /var/www/aos-collection/public/files/
 Ihre Age of Sigmar Sammlung ist jetzt vollständig digital und lokal gespeichert! 
 
 **Alle Einheiten, STL-Dateien und Bilder werden permanent auf Ihrem Raspberry Pi gespeichert und sind von allen Geräten in Ihrem Netzwerk zugänglich.** 🏆⚔️
+
+### Vollständige AoS 4. Edition Features:
+- 🏛️ **Alle 4 Hauptfraktionen** mit 20+ Armeen
+- ✨ **Others Kategorie** für Endless Spells & Buildings
+- 🛡️ **Sichere Einheiten-Verwaltung** mit Lösch-Schutz
+- 📱 **Moderne Benutzeroberfläche** mit Sticky Navigation
+- 🔍 **Erweiterte Suche** mit Multi-Keyword-Support
+- 📁 **Automatische Datei-Organisation** nach Fraktionen
+- 🎯 **Vollständige AoS-Datenstruktur** (Stats, Waffen, Fähigkeiten)
 
 ### Nützliche Links:
 - **Website**: http://IHRE_RASPBERRY_PI_IP/
