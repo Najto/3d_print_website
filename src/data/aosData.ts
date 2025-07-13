@@ -4373,5 +4373,7 @@ export const aosGameData: AoSGameData = {
       category: "core"
     },
     {
+    }
+  ]
   terrainRules: []
 };
