@@ -145,12 +145,9 @@ function App() {
               onClick={handleBackToHome}
               className="hover:text-yellow-400 transition-colors"
             >
-              {currentArmy 
+              {Object.values(aosGameData.allegianceGroups).find(allegiance =>
                 allegiance.armies.includes(currentArmy.id)
-                    allegiance.armies.includes(currentArmy.id)
-                  )?.name
-                : 'Others'
-              }
+              )?.name || 'Others'}
             </button>
             <ChevronRight className="w-4 h-4 text-gray-600" />
             <span className="text-white font-medium">{currentArmy.name}</span>
