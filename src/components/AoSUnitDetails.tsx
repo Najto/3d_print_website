@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Download, FileText, Zap, Shield, Swords, Info, Edit } from 'lucide-react';
+import { X, Download, FileText, Zap, Shield, Swords, Info, Edit, Trash2 } from 'lucide-react';
 import { AoSUnit } from '../types/AoSCollection';
 import { fileService } from '../services/fileService';
 
@@ -7,9 +7,10 @@ interface AoSUnitDetailsProps {
   unit: AoSUnit;
   onClose: () => void;
   onEdit?: (unit: AoSUnit) => void;
+  onDelete?: (unit: AoSUnit) => void;
 }
 
-export function AoSUnitDetails({ unit, onClose, onEdit }: AoSUnitDetailsProps) {
+export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetailsProps) {
   const totalSTLSize = unit.stlFiles?.reduce((acc, file) => {
     const size = parseFloat(file.size);
     return acc + size;
@@ -32,6 +33,15 @@ export function AoSUnitDetails({ unit, onClose, onEdit }: AoSUnitDetailsProps) {
               >
                 <Edit className="w-4 h-4" />
                 <span>Bearbeiten</span>
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={() => onDelete(unit)}
+                className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Löschen</span>
               </button>
             )}
             <button

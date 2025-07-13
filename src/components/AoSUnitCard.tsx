@@ -174,23 +174,6 @@ export function AoSUnitCard({ unit, onViewDetails, onEdit, onDelete }: AoSUnitCa
           )}
         </div>
         
-        {/* Edit Button */}
-        <button 
-          onClick={() => onEdit?.(unit)}
-          className="w-full bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 mb-2"
-        >
-          <Edit className="w-4 h-4" />
-          <span>Bearbeiten</span>
-        </button>
-        
-        {/* Delete Button */}
-        <button 
-          onClick={() => onDelete?.(unit)}
-          className="w-full bg-red-600 hover:bg-red-500 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
-        >
-          <Trash2 className="w-4 h-4" />
-          <span>Löschen</span>
-        </button>
       </div>
     </div>
   );

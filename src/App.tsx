@@ -352,6 +352,7 @@ function App() {
           unit={selectedUnit}
           onClose={() => setSelectedUnit(null)}
           onEdit={handleEditUnit}
+          onDelete={handleDeleteUnit}
         />
       )}
 
