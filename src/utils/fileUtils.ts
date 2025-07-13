@@ -26,15 +26,15 @@ export const validateImageFile = (file: File): boolean => {
 };
 
 export const validateSTLFile = (file: File): boolean => {
-  const maxSize = 100 * 1024 * 1024; // 100MB
+  const maxSize = 1024 * 1024 * 1024; // 1GB for archives
   
   if (!file.name.toLowerCase().endsWith('.stl')) {
-    alert('Ungültiger Dateityp. Bitte wähle eine STL-Datei.');
+    alert('Ungültiger Dateityp. Bitte wähle eine STL-Datei oder ein komprimiertes Archiv.');
     return false;
   }
   
   if (file.size > maxSize) {
-    alert('STL-Datei zu groß. Maximale Größe: 100MB.');
+    alert('Datei zu groß. Maximale Größe: 1GB.');
     return false;
   }
   

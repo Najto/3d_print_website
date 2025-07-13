@@ -136,7 +136,7 @@ export function FileUpload({
   const getDescription = () => {
     return type === 'image' 
       ? 'JPG, PNG oder GIF bis 10MB' 
-      : 'STL-Dateien oder komprimierte Archive (.stl, .xz, .gz, .zip, .7z, .rar) bis 100MB';
+      : 'STL-Dateien oder komprimierte Archive (.stl, .xz, .gz, .zip, .7z, .rar) bis 1GB';
   };
 
   return (
