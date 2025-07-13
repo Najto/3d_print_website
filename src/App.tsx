@@ -173,7 +173,7 @@ function App() {
 
         {/* Content */}
         {/* Allegiance Overview with Listed Armies */}
-        {!isSearchActive && !currentArmy && (
+        {!isSearchActive && !currentItem && (
           <div className="space-y-12">
             {/* Main Allegiances */}
             {Object.entries(aosGameData.allegianceGroups).map(([key, allegiance]) => {
