@@ -208,6 +208,18 @@ export function useAoSData() {
     return [];
   };
 
+  const scanAllFoldersForNewUnits = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/scan-all-folders`);
+      if (response.ok) {
+        const result = await response.json();
+        return result;
+      }
+    } catch (error) {
+      console.error('Error scanning all folders:', error);
+    }
+    return { allNewUnits: {}, totalNewUnits: 0, scannedArmies: 0, summary: [] };
+  };
   const addScannedUnits = (armyId: string, newUnits: AoSUnit[]) => {
     if (newUnits.length === 0) return;
     
@@ -245,12 +257,53 @@ export function useAoSData() {
     saveCustomData(newGameData);
   };
 
+  const addAllScannedUnits = (allNewUnits: { [armyId: string]: AoSUnit[] }) => {
+    let newGameData = { ...gameData };
+    
+    // Process each army's new units
+    Object.entries(allNewUnits).forEach(([armyId, newUnits]) => {
+      if (newUnits.length === 0) return;
+      
+      // Update armies
+      newGameData.armies = newGameData.armies.map(army => {
+        if (army.id === armyId) {
+          const existingUnitIds = army.units.map(u => u.id);
+          const unitsToAdd = newUnits.filter(unit => !existingUnitIds.includes(unit.id));
+          
+          return {
+            ...army,
+            units: [...army.units, ...unitsToAdd]
+          };
+        }
+        return army;
+      });
+      
+      // Update other categories
+      newGameData.otherCategories = newGameData.otherCategories?.map(category => {
+        if (category.id === armyId) {
+          const existingUnitIds = category.units.map(u => u.id);
+          const unitsToAdd = newUnits.filter(unit => !existingUnitIds.includes(unit.id));
+          
+          return {
+            ...category,
+            units: [...category.units, ...unitsToAdd]
+          };
+        }
+        return category;
+      }) || [];
+    });
+    
+    setGameData(newGameData);
+    saveCustomData(newGameData);
+  };
   return {
     gameData,
     updateUnit,
     deleteUnit,
     resetToDefault,
     scanFoldersForNewUnits,
+    scanAllFoldersForNewUnits,
     addScannedUnits
+    addAllScannedUnits
   };
 }

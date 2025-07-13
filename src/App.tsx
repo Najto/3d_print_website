@@ -14,7 +14,7 @@ import { useState } from 'react';
 import { cleanupOldFiles } from './utils/fileUtils';
 
 function App() {
-  const { gameData: aosGameData, updateUnit, deleteUnit, scanFoldersForNewUnits, addScannedUnits } = useAoSData();
+  const { gameData: aosGameData, updateUnit, deleteUnit, scanFoldersForNewUnits, scanAllFoldersForNewUnits, addScannedUnits, addAllScannedUnits } = useAoSData();
   const [selectedArmy, setSelectedArmy] = useState<string | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<AoSUnit | null>(null);
   const [editingUnit, setEditingUnit] = useState<AoSUnit | null>(null);
@@ -23,6 +23,7 @@ function App() {
   const [showOnlyDownloadable, setShowOnlyDownloadable] = useState(false);
   const [unitToDelete, setUnitToDelete] = useState<AoSUnit | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [isGlobalScanning, setIsGlobalScanning] = useState(false);
   
   // Cleanup old files on app start
   React.useEffect(() => {
@@ -147,6 +148,33 @@ function App() {
     }
   };
 
+  const handleGlobalScanFolders = async () => {
+    setIsGlobalScanning(true);
+    try {
+      const result = await scanAllFoldersForNewUnits();
+      if (result.totalNewUnits > 0) {
+        addAllScannedUnits(result.allNewUnits);
+        
+        // Create detailed summary message
+        const summaryLines = [
+          `🎉 ${result.totalNewUnits} neue Einheit${result.totalNewUnits !== 1 ? 'en' : ''} aus ${result.scannedArmies} Armeen gefunden!`,
+          '',
+          ...result.summary.map(army => 
+            `📦 ${army.armyName}: ${army.newUnitsCount} Einheit${army.newUnitsCount !== 1 ? 'en' : ''}\n${army.unitNames.map(name => `   • ${name}`).join('\n')}`
+          )
+        ];
+        
+        alert(summaryLines.join('\n'));
+      } else {
+        alert(`🔍 Alle ${result.scannedArmies} Armeen gescannt - keine neuen Einheiten gefunden.`);
+      }
+    } catch (error) {
+      console.error('Global scan error:', error);
+      alert('Fehler beim globalen Ordner-Scan.');
+    } finally {
+      setIsGlobalScanning(false);
+    }
+  };
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
@@ -161,6 +189,22 @@ function App() {
                 <h1 className="text-xl font-bold text-white">Warhammer Age of Sigmar</h1>
                 <p className="text-gray-400 text-sm">4. Edition - Armeen & 3D-Druckdateien</p>
               </div>
+            </div>
+            
+            {/* Global Scan Button */}
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={handleGlobalScanFolders}
+                disabled={isGlobalScanning}
+                className="bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+              >
+                {isGlobalScanning ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                <span>{isGlobalScanning ? 'Scanne alle...' : 'Alle Ordner scannen'}</span>
+              </button>
             </div>
           </div>
         </div>
