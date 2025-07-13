@@ -35,7 +35,7 @@ export function AoSArmyCard({ army, onClick }: AoSArmyCardProps) {
   return (
     <div
       onClick={onClick}
-      className="bg-gray-800 rounded-lg p-6 hover:bg-gray-750 transition-all duration-300 cursor-pointer group border border-gray-700 hover:border-yellow-500"
+      className="bg-gray-800 rounded-lg p-6 hover:bg-gray-750 transition-all duration-300 cursor-pointer group border border-gray-700 hover:border-green-500"
     >
       <div className="flex items-center justify-between flex-wrap mb-4">
         <div className="flex items-center flex-wrap space-x-3">
