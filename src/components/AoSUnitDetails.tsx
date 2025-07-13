@@ -226,7 +226,12 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
                     <div>
                       <div className="text-white font-medium">{file.name}</div>
                       <div className="text-gray-400 text-sm">
-                        {file.size}
+                        {file.compressedSize || file.size}
+                        {file.isCompressed && (
+                          <span className="ml-2 text-green-400">
+                            📦 Komprimiert ({file.compressionRatio} gespart)
+                          </span>
+                        )}
                         {file.variant && (
                           <span className="ml-2 text-green-400">({file.variant})</span>
                         )}
@@ -237,12 +242,12 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
                     </div>
                     <button 
                       onClick={() => {
-                        if (file.path) {
-                          const downloadUrl = fileService.getDownloadUrl(file.path);
+                        if (file.path || file.actualName) {
+                          const fileName = file.actualName || file.name;
+                          const downloadUrl = `/api/download/${getAllegianceFromArmy(armyId)}/${armyId}/${unit.name}/${fileName}`;
                           const link = document.createElement('a');
                           link.href = downloadUrl;
                           link.download = file.name;
-                          link.target = '_blank';
                           document.body.appendChild(link);
                           link.click();
                           document.body.removeChild(link);
@@ -261,27 +266,27 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
               <div className="flex items-center justify-between">
                 <div className="text-gray-400 text-sm">
                   Gesamt: {totalSTLSize.toFixed(1)} MB
+                  {unit.stlFiles?.some(f => f.isCompressed) && (
+                    <span className="ml-2 text-green-400">
+                      💾 Speicher gespart durch Komprimierung
+                    </span>
+                  )}
                 </div>
                 <button 
                   onClick={() => {
-                    // Download all available files
-                    unit.stlFiles?.forEach(file => {
-                      if (file.path) {
-                        const downloadUrl = fileService.getDownloadUrl(file.path);
-                        const link = document.createElement('a');
-                        link.href = downloadUrl;
-                        link.download = file.name;
-                        link.target = '_blank';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                      }
-                    });
+                    // Download all files as compressed archive
+                    const downloadUrl = `/api/download-all/${getAllegianceFromArmy(armyId)}/${armyId}/${unit.name}`;
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.download = `${unit.name}_stl_files.zip`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
                   }}
                   className="bg-green-600 hover:bg-green-500 text-white py-2 px-4 rounded-lg transition-colors flex items-center space-x-2"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Alle herunterladen</span>
+                  <span>Alle als ZIP herunterladen</span>
                 </button>
               </div>
             </div>
