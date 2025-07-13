@@ -557,7 +557,7 @@ export function AoSUnitEditor({ unit, armyId, onSave, onClose }: AoSUnitEditorPr
                 <div className="mb-4">
                   <FileUpload
                     type="stl"
-                    accept=".stl"
+                   accept=".stl,.xz,.gz,.zip,.7z"
                     allegiance={allegiance}
                     faction={armyId}
                     unit={formData.name}

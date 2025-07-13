@@ -39,8 +39,8 @@ export function FileUpload({
       alert('Bitte wähle eine Bilddatei aus.');
       return;
     }
-    if (type === 'stl' && !file.name.toLowerCase().endsWith('.stl')) {
-      alert('Bitte wähle eine STL-Datei aus.');
+    if (type === 'stl' && !/\.(stl|xz|gz|zip|7z)$/i.test(file.name)) {
+      alert('Bitte wähle eine STL-Datei oder komprimierte Datei aus (.stl, .xz, .gz, .zip, .7z).');
       return;
     }
 
@@ -136,7 +136,7 @@ export function FileUpload({
   const getDescription = () => {
     return type === 'image' 
       ? 'JPG, PNG oder GIF bis 10MB' 
-      : 'STL-Dateien bis 100MB';
+      : 'STL-Dateien oder komprimierte Archive (.stl, .xz, .gz, .zip, .7z) bis 100MB';
   };
 
   return (

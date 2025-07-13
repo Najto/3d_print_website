@@ -229,7 +229,7 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
                         {file.compressedSize || file.size}
                         {file.isCompressed && (
                           <span className="ml-2 text-green-400">
-                            📦 Komprimiert ({file.compressionRatio} gespart)
+                            📦 {file.preCompressed ? 'Pre-komprimiert' : `Komprimiert (${file.compressionRatio} gespart)`}
                           </span>
                         )}
                         {file.variant && (
@@ -240,25 +240,48 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
                         )}
                       </div>
                     </div>
-                    <button 
-                      onClick={() => {
-                        if (file.path || file.actualName) {
-                          const fileName = file.actualName || file.name;
-                          const downloadUrl = `/api/download/${getAllegianceFromArmy(armyId)}/${armyId}/${unit.name}/${fileName}`;
-                          const link = document.createElement('a');
-                          link.href = downloadUrl;
-                          link.download = file.name;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        } else {
-                          alert('Diese Datei ist nicht zum Download verfügbar.');
-                        }
-                      }}
-                      className="bg-green-600 hover:bg-green-500 text-white p-2 rounded transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
+                   <div className="flex space-x-1">
+                     <button 
+                       onClick={() => {
+                         if (file.path || file.actualName) {
+                           const fileName = file.actualName || file.name;
+                           const downloadUrl = `/api/download/${getAllegianceFromArmy(armyId)}/${armyId}/${unit.name}/${fileName}`;
+                           const link = document.createElement('a');
+                           link.href = downloadUrl;
+                           link.download = file.name.replace(/\.(xz|gz|zip|7z)$/i, '.stl');
+                           document.body.appendChild(link);
+                           link.click();
+                           document.body.removeChild(link);
+                         } else {
+                           alert('Diese Datei ist nicht zum Download verfügbar.');
+                         }
+                       }}
+                       className="bg-green-600 hover:bg-green-500 text-white p-2 rounded transition-colors"
+                       title="STL herunterladen (dekomprimiert)"
+                     >
+                       <Download className="w-4 h-4" />
+                     </button>
+                     {file.isCompressed && (
+                       <button 
+                         onClick={() => {
+                           if (file.path || file.actualName) {
+                             const fileName = file.actualName || file.name;
+                             const downloadUrl = `/api/download/${getAllegianceFromArmy(armyId)}/${armyId}/${unit.name}/${fileName}/compressed`;
+                             const link = document.createElement('a');
+                             link.href = downloadUrl;
+                             link.download = fileName;
+                             document.body.appendChild(link);
+                             link.click();
+                             document.body.removeChild(link);
+                           }
+                         }}
+                         className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded transition-colors"
+                         title="Komprimierte Datei herunterladen"
+                       >
+                         📦
+                       </button>
+                     )}
+                   </div>
                   </div>
                 ))}
               </div>

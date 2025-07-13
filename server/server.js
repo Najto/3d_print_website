@@ -106,14 +106,19 @@ const upload = multer({
   },
   fileFilter: (req, file, cb) => {
     // Allow images and STL files
-    const allowedTypes = /jpeg|jpg|png|gif|webp|stl/;
+    const allowedTypes = /jpeg|jpg|png|gif|webp|stl|xz|gz|zip|7z/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype) || file.mimetype === 'application/octet-stream';
+    const mimetype = allowedTypes.test(file.mimetype) || 
+                     file.mimetype === 'application/octet-stream' ||
+                     file.mimetype === 'application/x-xz' ||
+                     file.mimetype === 'application/gzip' ||
+                     file.mimetype === 'application/zip' ||
+                     file.mimetype === 'application/x-7z-compressed';
     
     if (mimetype && extname) {
       return cb(null, true);
     } else {
-      cb(new Error('Nur Bilder (JPG, PNG, GIF, WebP) und STL-Dateien sind erlaubt!'));
+      cb(new Error('Nur Bilder (JPG, PNG, GIF, WebP), STL-Dateien und komprimierte Archive sind erlaubt!'));
     }
   }
 });
@@ -154,40 +159,59 @@ app.post('/api/upload', upload.fields([
       for (const file of req.files.stlFiles) {
         const originalPath = file.path;
         const originalSize = file.size;
+        const isAlreadyCompressed = /\.(xz|gz|zip|7z)$/i.test(file.filename);
         
-        try {
-          // Compress STL file
-          const compressionResult = await compressionService.compressSTL(
-            originalPath,
-            path.join(path.dirname(originalPath), path.parse(file.filename).name)
-          );
-          
-          // Remove original uncompressed file
-          fs.unlinkSync(originalPath);
-          
-          // Add compressed file info
+        if (isAlreadyCompressed) {
+          // File is already compressed - keep as is
+          console.log(`📦 Pre-compressed file detected: ${file.filename}`);
           uploadedFiles.stlFiles.push({
             name: file.filename,
-            compressedName: path.basename(compressionResult.compressedPath),
-            originalSize: `${(originalSize / (1024 * 1024)).toFixed(1)} MB`,
-            compressedSize: `${(compressionResult.compressedSize / (1024 * 1024)).toFixed(1)} MB`,
-            compressionRatio: `${compressionResult.compressionRatio}%`,
-            path: `${folderPath}/${path.basename(compressionResult.compressedPath)}`,
-            isCompressed: true
-          });
-          
-        } catch (compressionError) {
-          console.error('Compression failed for', file.filename, '- keeping original:', compressionError);
-          
-          // Keep original file if compression fails
-          uploadedFiles.stlFiles.push({
-            name: file.filename,
+            compressedName: file.filename,
             originalSize: `${(originalSize / (1024 * 1024)).toFixed(1)} MB`,
             compressedSize: `${(originalSize / (1024 * 1024)).toFixed(1)} MB`,
-            compressionRatio: '0%',
+            compressionRatio: 'Pre-compressed',
             path: `${folderPath}/${file.filename}`,
-            isCompressed: false
+            isCompressed: true,
+            preCompressed: true
           });
+        } else {
+          // Try to compress uncompressed STL files
+          try {
+            // Compress STL file
+            const compressionResult = await compressionService.compressSTL(
+              originalPath,
+              path.join(path.dirname(originalPath), path.parse(file.filename).name)
+            );
+            
+            // Remove original uncompressed file
+            fs.unlinkSync(originalPath);
+            
+            // Add compressed file info
+            uploadedFiles.stlFiles.push({
+              name: file.filename,
+              compressedName: path.basename(compressionResult.compressedPath),
+              originalSize: `${(originalSize / (1024 * 1024)).toFixed(1)} MB`,
+              compressedSize: `${(compressionResult.compressedSize / (1024 * 1024)).toFixed(1)} MB`,
+              compressionRatio: `${compressionResult.compressionRatio}%`,
+              path: `${folderPath}/${path.basename(compressionResult.compressedPath)}`,
+              isCompressed: true,
+              preCompressed: false
+            });
+            
+          } catch (compressionError) {
+            console.error('Compression failed for', file.filename, '- keeping original:', compressionError);
+            
+            // Keep original file if compression fails
+            uploadedFiles.stlFiles.push({
+              name: file.filename,
+              originalSize: `${(originalSize / (1024 * 1024)).toFixed(1)} MB`,
+              compressedSize: `${(originalSize / (1024 * 1024)).toFixed(1)} MB`,
+              compressionRatio: '0%',
+              path: `${folderPath}/${file.filename}`,
+              isCompressed: false,
+              preCompressed: false
+            });
+          }
         }
       }
     }
@@ -209,9 +233,9 @@ app.post('/api/upload', upload.fields([
 });
 
 // Download endpoint with decompression
-app.get('/api/download/:allegiance/:faction/:unit/:filename', async (req, res) => {
+app.get('/api/download/:allegiance/:faction/:unit/:filename/:compressed?', async (req, res) => {
   try {
-    const { allegiance, faction, unit, filename } = req.params;
+    const { allegiance, faction, unit, filename, compressed } = req.params;
     
     const sanitize = (str) => str.toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
@@ -230,17 +254,26 @@ app.get('/api/download/:allegiance/:faction/:unit/:filename', async (req, res) =
       return res.status(404).json({ error: 'Datei nicht gefunden' });
     }
 
-    // Check if file is compressed
-    if (filename.endsWith('.xz')) {
+    // Check if user wants compressed version or file should be decompressed
+    const wantsCompressed = compressed === 'compressed';
+    const isCompressedFile = /\.(xz|gz|zip|7z)$/i.test(filename);
+    
+    if (isCompressedFile && !wantsCompressed) {
       // Decompress on-the-fly
       const tempDir = path.join(__dirname, 'temp');
       fs.mkdirSync(tempDir, { recursive: true });
       
-      const originalFilename = filename.replace('.xz', '');
+      const originalFilename = filename.replace(/\.(xz|gz|zip|7z)$/i, '.stl');
       const tempPath = path.join(tempDir, `${Date.now()}_${originalFilename}`);
       
       try {
-        await compressionService.decompressSTL(filePath, tempPath);
+        if (filename.endsWith('.xz')) {
+          await compressionService.decompressSTL(filePath, tempPath);
+        } else {
+          // For other compression formats, copy as-is for now
+          // Could be extended with additional decompression methods
+          fs.copyFileSync(filePath, tempPath);
+        }
         
         res.setHeader('Content-Disposition', `attachment; filename="${originalFilename}"`);
         res.setHeader('Content-Type', 'application/octet-stream');
@@ -260,7 +293,7 @@ app.get('/api/download/:allegiance/:faction/:unit/:filename', async (req, res) =
         res.status(500).json({ error: 'Fehler beim Dekomprimieren der Datei' });
       }
     } else {
-      // Serve file directly
+      // Serve file directly (either uncompressed or user wants compressed version)
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.sendFile(filePath);
     }
