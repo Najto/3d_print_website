@@ -152,7 +152,8 @@ function App() {
 
         {/* Breadcrumb Navigation */}
         {!isSearchActive && currentItem && (
-          <nav className="flex items-center space-x-2 text-sm text-gray-400 mb-6">
+          <nav className="sticky top-16 z-20 bg-gray-900 py-4 mb-6 border-b border-gray-700">
+            <div className="flex items-center space-x-2 text-sm text-gray-400">
             <button
               onClick={handleBackToHome}
               className="flex items-center hover:text-yellow-400 transition-colors"
@@ -173,6 +174,7 @@ function App() {
             </button>
             <ChevronRight className="w-4 h-4 text-gray-600" />
             <span className="text-white font-medium">{currentItem.name}</span>
+            </div>
           </nav>
         )}
 
