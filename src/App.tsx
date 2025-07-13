@@ -5,6 +5,7 @@ import { AoSArmyCard } from './components/AoSArmyCard';
 import { AoSUnitCard } from './components/AoSUnitCard';
 import { AoSUnitDetails } from './components/AoSUnitDetails';
 import { AoSUnitEditor } from './components/AoSUnitEditor';
+import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { SearchBar } from './components/SearchBar';
 import { useAoSData } from './hooks/useAoSData';
 import { AoSUnit } from './types/AoSCollection';
@@ -19,6 +20,7 @@ function App() {
   const [isCreatingUnit, setIsCreatingUnit] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showOnlyDownloadable, setShowOnlyDownloadable] = useState(false);
+  const [unitToDelete, setUnitToDelete] = useState<AoSUnit | null>(null);
   
   // Cleanup old files on app start
   React.useEffect(() => {
@@ -84,6 +86,21 @@ function App() {
   const handleEditUnit = (unit: AoSUnit) => {
     setEditingUnit(unit);
     setSelectedUnit(null);
+  };
+
+  const handleDeleteUnit = (unit: AoSUnit) => {
+    setUnitToDelete(unit);
+  };
+
+  const confirmDeleteUnit = () => {
+    if (unitToDelete && selectedArmy) {
+      deleteUnit(selectedArmy, unitToDelete.id);
+      setUnitToDelete(null);
+    }
+  };
+
+  const cancelDeleteUnit = () => {
+    setUnitToDelete(null);
   };
 
   const handleCreateUnit = () => {
@@ -283,6 +300,7 @@ function App() {
                   unit={unit} 
                   onViewDetails={handleUnitDetails}
                   onEdit={handleEditUnit}
+                  onDelete={handleDeleteUnit}
                 />
               ))}
             </div>
@@ -310,6 +328,7 @@ function App() {
                 unit={unit} 
                 onViewDetails={handleUnitDetails}
                 onEdit={handleEditUnit}
+                onDelete={handleDeleteUnit}
               />
             ))}
           </div>
@@ -343,6 +362,15 @@ function App() {
           armyId={selectedArmy}
           onSave={handleSaveUnit}
           onClose={handleCloseEditor}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {unitToDelete && (
+        <DeleteConfirmationModal
+          unit={unitToDelete}
+          onConfirm={confirmDeleteUnit}
+          onCancel={cancelDeleteUnit}
         />
       )}
 
