@@ -37,8 +37,7 @@ function App() {
 
   // Search functionality
   const searchResults = searchTerm ? [
-    ...aosGameData.armies,
-    ...(aosGameData.otherCategories || [])
+    ...aosGameData.armies
   ].flatMap(army => {
     // Split search term into individual keywords and clean them
     const searchKeywords = searchTerm.toLowerCase()

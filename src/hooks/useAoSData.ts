@@ -52,17 +52,7 @@ export function useAoSData() {
           };
         }
         return army;
-      }),
-      otherCategories: initialData.otherCategories?.map(category => {
-        const customCategory = customData.otherCategories?.find((c: AoSArmy) => c.id === category.id);
-        if (customCategory) {
-          return {
-            ...category,
-            units: customCategory.units
-          };
-        }
-        return category;
-      }) || []
+      })
     };
   };
 
