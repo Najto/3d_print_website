@@ -93,7 +93,9 @@ export function FileUpload({
 
     } catch (error) {
       setUploadStatus('error');
-      setUploadMessage(error instanceof Error ? error.message : 'Upload fehlgeschlagen');
+      const errorMessage = error instanceof Error ? error.message : 'Upload fehlgeschlagen';
+      setUploadMessage(errorMessage);
+      console.error('Upload error details:', error);
     } finally {
       setUploading(false);
     }

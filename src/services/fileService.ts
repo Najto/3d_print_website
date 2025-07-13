@@ -56,17 +56,42 @@ class FileService {
       });
     }
     
-    const response = await fetch(`${API_BASE_URL}/upload`, {
-      method: 'POST',
-      body: formData,
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Upload fehlgeschlagen');
+    try {
+      const response = await fetch(`${API_BASE_URL}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      // Check if response is actually JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        console.error('Non-JSON response received:', textResponse);
+        
+        if (textResponse.includes('<html>')) {
+          throw new Error('Server-Fehler: Backend nicht erreichbar. Prüfen Sie ob der Server läuft.');
+        } else {
+          throw new Error(`Server-Antwort: ${textResponse.substring(0, 200)}...`);
+        }
+      }
+      
+      if (!response.ok) {
+        try {
+          const error = await response.json();
+          throw new Error(error.error || `Upload fehlgeschlagen (${response.status})`);
+        } catch (jsonError) {
+          throw new Error(`Upload fehlgeschlagen: HTTP ${response.status}`);
+        }
+      }
+      
+      return response.json();
+      
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Netzwerk-Fehler: Backend nicht erreichbar. Prüfen Sie die Verbindung.');
+      }
+      throw error;
     }
-    
-    return response.json();
   }
   
   async getFiles(
@@ -74,15 +99,33 @@ class FileService {
     faction: string,
     unit: string
   ): Promise<FilesResponse> {
-    const response = await fetch(
-      `${API_BASE_URL}/files/${encodeURIComponent(allegiance)}/${encodeURIComponent(faction)}/${encodeURIComponent(unit)}`
-    );
-    
-    if (!response.ok) {
-      throw new Error('Fehler beim Abrufen der Dateien');
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/files/${encodeURIComponent(allegiance)}/${encodeURIComponent(faction)}/${encodeURIComponent(unit)}`
+      );
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        if (textResponse.includes('<html>')) {
+          throw new Error('Backend nicht erreichbar');
+        }
+        throw new Error('Unerwartete Server-Antwort');
+      }
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Fehler beim Abrufen der Dateien');
+      }
+      
+      return response.json();
+      
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Backend nicht erreichbar');
+      }
+      throw error;
     }
-    
-    return response.json();
   }
   
   async deleteFile(
@@ -109,9 +152,15 @@ class FileService {
   async checkHealth(): Promise<{ status: string; message: string }> {
     try {
       const response = await fetch(`${API_BASE_URL}/health`);
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Backend antwortet nicht korrekt');
+      }
+      
       return response.json();
     } catch (error) {
-      throw new Error('Server nicht erreichbar');
+      throw new Error('Backend nicht erreichbar - prüfen Sie ob der Server läuft');
     }
   }
   
