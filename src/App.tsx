@@ -332,8 +332,8 @@ function App() {
         {!isSearchActive && currentItem && (
           <div>
             {/* Filter Buttons */}
-            <div className="flex items-center flex-wrap: wrap justify-between mb-6">
-              <div className="flex items-center flex-wrap: wrap space-x-4">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between space-x-4">
                 <button
                   onClick={handleCreateUnit}
                   className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
