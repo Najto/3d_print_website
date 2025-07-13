@@ -104,21 +104,48 @@ const upload = multer({
     fileSize: 100 * 1024 * 1024 // 100MB limit
   },
   fileFilter: (req, file, cb) => {
+    console.log(`🔍 File filter check:`, {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+    
     // Allow images and STL files
-    const allowedTypes = /jpeg|jpg|png|gif|webp|stl|xz|gz|zip|7z|rar/;
+    const allowedTypes = /\.(jpeg|jpg|png|gif|webp|stl|xz|gz|zip|7z|rar)$/i;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype) || 
+    
+    // Extended MIME type support for ZIP files
+    const allowedMimeTypes = [
+      'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+      'application/octet-stream',
+      'application/x-xz',
+      'application/gzip',
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/x-7z-compressed',
+      'application/x-rar-compressed',
+      'application/vnd.rar',
+      'model/stl',
+      'application/sla'
+    ];
+    
+    const mimetype = allowedMimeTypes.includes(file.mimetype) || 
                      file.mimetype === 'application/octet-stream' ||
-                     file.mimetype === 'application/x-xz' ||
-                     file.mimetype === 'application/gzip' ||
-                     file.mimetype === 'application/zip' ||
-                     file.mimetype === 'application/x-7z-compressed' ||
-                     file.mimetype === 'application/x-rar-compressed' ||
-                     file.mimetype === 'application/vnd.rar';
+                     file.mimetype.includes('zip') ||
+                     file.mimetype.includes('compressed');
+    
+    console.log(`📋 Validation result:`, {
+      extname: extname,
+      mimetype: mimetype,
+      accepted: mimetype && extname
+    });
     
     if (mimetype && extname) {
+      console.log(`✅ File accepted: ${file.originalname}`);
       return cb(null, true);
     } else {
+      console.log(`❌ File rejected: ${file.originalname} (${file.mimetype})`);
       cb(new Error(`Ungültiger Dateityp: ${file.mimetype}. Nur Bilder (JPG, PNG, GIF, WebP), STL-Dateien und komprimierte Archive (.stl, .xz, .gz, .zip, .7z, .rar) sind erlaubt!`));
     }
   }
@@ -128,17 +155,35 @@ const upload = multer({
 app.post('/api/upload', upload.fields([
   { name: 'preview', maxCount: 1 },
   { name: 'stlFiles', maxCount: 20 }
-]), (req, res) => {
+]), (req, res, next) => {
+  console.log(`\n🚀 === UPLOAD REQUEST START ===`);
+  console.log(`📅 Timestamp: ${new Date().toISOString()}`);
+  console.log(`🌐 Request URL: ${req.url}`);
+  console.log(`📋 Request method: ${req.method}`);
+  console.log(`📦 Content-Type: ${req.get('Content-Type')}`);
+  
   try {
-    console.log('📤 Upload request received:', {
+    console.log('📤 Upload request body:', {
       body: req.body,
-      files: req.files ? Object.keys(req.files) : 'no files'
+      files: req.files ? Object.keys(req.files).map(key => ({
+        field: key,
+        count: req.files[key].length,
+        files: req.files[key].map(f => ({
+          name: f.originalname,
+          size: f.size,
+          mimetype: f.mimetype
+        }))
+      })) : 'no files'
     });
 
     const { allegiance, faction, unit } = req.body;
     
     if (!allegiance || !faction || !unit) {
-      console.log('❌ Missing required fields:', { allegiance, faction, unit });
+      console.log('❌ Missing required fields:', { 
+        allegiance: allegiance || 'MISSING', 
+        faction: faction || 'MISSING', 
+        unit: unit || 'MISSING' 
+      });
       return res.status(400).json({ 
         error: 'Allegiance, Faction und Unit sind erforderlich' 
       });
@@ -165,39 +210,52 @@ app.post('/api/upload', upload.fields([
     if (req.files.stlFiles) {
       console.log(`📁 Processing ${req.files.stlFiles.length} files...`);
       for (const file of req.files.stlFiles) {
-        console.log(`📄 File uploaded: ${file.filename} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`);
+        console.log(`📄 Processing file:`, {
+          original: file.originalname,
+          saved: file.filename,
+          size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+          mimetype: file.mimetype,
+          path: file.path
+        });
         
         uploadedFiles.stlFiles.push({
           name: file.filename,
           size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
           path: `${folderPath}/${file.filename}`
         });
+        
+        console.log(`✅ File processed successfully: ${file.filename}`);
       }
     }
 
-    console.log('✅ Upload processing completed successfully');
-    console.log('📋 Response data:', {
-      success: true,
-      filesCount: uploadedFiles.stlFiles.length,
-      folderPath: folderPath
-    });
-
-    res.json({
+    const responseData = {
       success: true,
       message: 'Dateien erfolgreich hochgeladen',
       files: uploadedFiles,
       folderPath: folderPath
-    });
+    };
+    
+    console.log('✅ Upload processing completed successfully');
+    console.log('📋 Response data:', responseData);
+    console.log(`🏁 === UPLOAD REQUEST END ===\n`);
+
+    res.json(responseData);
 
   } catch (error) {
-    console.error('❌ Upload error:', error);
+    console.error('❌ === UPLOAD ERROR ===');
+    console.error('❌ Error message:', error.message);
     console.error('❌ Error stack:', error.stack);
+    console.error('❌ Request body:', req.body);
+    console.error('❌ Request files:', req.files);
+    console.error('❌ === END ERROR ===\n');
     
     // Ensure we always send a JSON response
-    res.status(500).json({ 
+    const errorResponse = { 
       error: 'Fehler beim Hochladen der Dateien',
       details: error.message 
-    });
+    };
+    
+    res.status(500).json(errorResponse);
   }
 });
 
@@ -385,13 +443,39 @@ app.get('/api/health', (req, res) => {
 
 // Error handling middleware
 app.use((error, req, res, next) => {
+  console.error('🚨 === MIDDLEWARE ERROR ===');
+  console.error('🚨 Error type:', error.constructor.name);
+  console.error('🚨 Error message:', error.message);
+  console.error('🚨 Request URL:', req.url);
+  console.error('🚨 Request method:', req.method);
+  
   if (error instanceof multer.MulterError) {
+    console.error('🚨 Multer error code:', error.code);
+    console.error('🚨 Multer error field:', error.field);
+    
     if (error.code === 'LIMIT_FILE_SIZE') {
+      console.error('🚨 File too large');
       return res.status(400).json({
         error: 'Datei zu groß. Maximum: 100MB'
       });
     }
+    
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      console.error('🚨 Too many files');
+      return res.status(400).json({
+        error: 'Zu viele Dateien. Maximum: 20 STL-Dateien'
+      });
+    }
+    
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      console.error('🚨 Unexpected file field');
+      return res.status(400).json({
+        error: 'Unerwartetes Dateifeld'
+      });
+    }
   }
+  
+  console.error('🚨 === END MIDDLEWARE ERROR ===\n');
   
   res.status(500).json({
     error: 'Server-Fehler',
