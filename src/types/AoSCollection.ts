@@ -96,4 +96,5 @@ export interface AoSGameData {
   universalSpells: string[];
   universalPrayers: string[];
   terrainRules: AoSRule[];
+  otherCategories: AoSArmy[];
 }
