@@ -3,7 +3,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
-
+const { initDB, getData, setData, clearData } = require('./dataStore');
+initDB();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -24,27 +25,22 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const dataFile = path.join(dataDir, 'aos-data.json');
 
 // Data persistence endpoints
-app.get('/api/data', (req, res) => {
+app.get('/api/data', async (req, res) => {
   try {
-    if (fs.existsSync(dataFile)) {
-      const data = fs.readFileSync(dataFile, 'utf8');
-      res.json(JSON.parse(data));
-    } else {
-      res.status(404).json({ error: 'No data found' });
-    }
+    const data = await getData();
+    res.json(data);
   } catch (error) {
     console.error('Error reading data:', error);
     res.status(500).json({ error: 'Failed to read data' });
   }
 });
 
-app.post('/api/data', (req, res) => {
+
+app.post('/api/data', async (req, res) => {
   try {
-    const data = req.body;
-    fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
+    await setData(req.body);
     res.json({ success: true, message: 'Data saved successfully' });
   } catch (error) {
     console.error('Error saving data:', error);
@@ -52,17 +48,17 @@ app.post('/api/data', (req, res) => {
   }
 });
 
-app.delete('/api/data', (req, res) => {
+
+app.delete('/api/data', async (req, res) => {
   try {
-    if (fs.existsSync(dataFile)) {
-      fs.unlinkSync(dataFile);
-    }
+    await clearData();
     res.json({ success: true, message: 'Data cleared successfully' });
   } catch (error) {
     console.error('Error clearing data:', error);
     res.status(500).json({ error: 'Failed to clear data' });
   }
 });
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
