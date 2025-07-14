@@ -581,7 +581,7 @@ app.get('/api/scan-all-folders', async (req, res) => {
     console.log('🔍 Starting global folder scan...');
 
     const { getData, setData } = require('./dataStore');
-    const filesDir = path.join(__dirname, 'public', 'files');
+    const existingData = await getData();
 
     const allegianceMap = {
       'stormcast-eternals': 'order',
@@ -593,6 +593,7 @@ app.get('/api/scan-all-folders', async (req, res) => {
       'fyreslayers': 'order',
       'kharadron-overlords': 'order',
       'seraphon': 'order',
+      
       'slaves-to-darkness': 'chaos',
       'khorne-bloodbound': 'chaos',
       'disciples-of-tzeentch': 'chaos',
@@ -600,14 +601,17 @@ app.get('/api/scan-all-folders', async (req, res) => {
       'hedonites-of-slaanesh': 'chaos',
       'skaven': 'chaos',
       'beasts-of-chaos': 'chaos',
+      
       'nighthaunt': 'death',
       'ossiarch-bonereapers': 'death',
       'flesh-eater-courts': 'death',
       'soulblight-gravelords': 'death',
+      
       'orruk-warclans': 'destruction',
       'gloomspite-gitz': 'destruction',
       'sons-of-behemat': 'destruction',
       'ogor-mawtribes': 'destruction',
+      
       'endless-spells': 'others',
       'buildings': 'others'
     };
@@ -617,22 +621,19 @@ app.get('/api/scan-all-folders', async (req, res) => {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
-    // 👇 Funktion zum Mergen neuer Daten in bestehende Units
-    function mergeUnitData(existingUnit, newUnit) {
+    const mergeUnitData = (existingUnit, newUnit) => {
       const merged = { ...existingUnit };
 
-      // Nur ersetzen, wenn ein neues Preview-Bild da ist
       if (newUnit.previewImage) {
         merged.previewImage = newUnit.previewImage;
       }
 
-      // Neue STL-Dateien hinzufügen, wenn noch nicht vorhanden
-      const existingFileNames = new Set(existingUnit.stlFiles.map(f => f.name));
-      const newFiles = newUnit.stlFiles.filter(f => !existingFileNames.has(f.name));
+      const existingNames = new Set(existingUnit.stlFiles.map(f => f.name));
+      const newFiles = newUnit.stlFiles.filter(f => !existingNames.has(f.name));
       merged.stlFiles = [...existingUnit.stlFiles, ...newFiles];
 
       return merged;
-    }
+    };
 
     const allNewUnits = {};
     let totalNewUnits = 0;
@@ -640,7 +641,6 @@ app.get('/api/scan-all-folders', async (req, res) => {
 
     for (const [armyId, allegiance] of Object.entries(allegianceMap)) {
       const armyFolderPath = path.join(filesDir, sanitize(allegiance), sanitize(armyId));
-
       if (!fs.existsSync(armyFolderPath)) {
         console.log(`⏭️ Skipping ${armyId} - folder not found`);
         continue;
@@ -657,7 +657,6 @@ app.get('/api/scan-all-folders', async (req, res) => {
       for (const folderName of folders) {
         const unitFolderPath = path.join(armyFolderPath, folderName);
         const files = fs.readdirSync(unitFolderPath);
-
         if (files.length === 0) continue;
 
         const unitName = folderName
@@ -718,43 +717,37 @@ app.get('/api/scan-all-folders', async (req, res) => {
       }
     }
 
-    // 🧠 Bestehende Daten laden
-    const existingData = await getData();
+    // 🧠 Bestehende Daten aktualisieren oder ergänzen
     const updatedArmies = [];
 
     for (const [armyId, newUnits] of Object.entries(allNewUnits)) {
       let army = existingData.armies.find(a => a.id === armyId);
 
       if (!army) {
-        // Neue Army
         updatedArmies.push({ id: armyId, units: newUnits });
       } else {
         for (const newUnit of newUnits) {
-          const existingIndex = army.units.findIndex(u => u.id === newUnit.id);
+          const existingUnitIndex = army.units.findIndex(u => u.id === newUnit.id);
 
-          if (existingIndex === -1) {
+          if (existingUnitIndex === -1) {
             army.units.push(newUnit);
           } else {
-            const merged = mergeUnitData(army.units[existingIndex], newUnit);
-            army.units[existingIndex] = merged;
+            army.units[existingUnitIndex] = mergeUnitData(army.units[existingUnitIndex], newUnit);
           }
         }
+
         updatedArmies.push(army);
       }
     }
 
-    // 🔄 Schreib in die Datenbank
-    await setData({
-      armies: updatedArmies,
-      otherCategories: existingData.otherCategories || []
-    });
+    await setData({ armies: updatedArmies, otherCategories: [] });
 
-    console.log(`🎉 Global scan complete: ${totalNewUnits} new units found across ${scannedArmies} armies`);
+    console.log(`🎉 Global scan complete: ${totalNewUnits} new or updated units across ${scannedArmies} armies`);
 
     res.json({
+      allNewUnits,
       totalNewUnits,
       scannedArmies,
-      allNewUnits,
       summary: Object.entries(allNewUnits).map(([armyId, units]) => ({
         armyId,
         armyName: armyId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
