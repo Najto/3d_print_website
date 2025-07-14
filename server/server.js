@@ -576,10 +576,13 @@ app.get('/api/scan-folders/:armyId', (req, res) => {
 });
 
 // Global scan for all armies
-app.get('/api/scan-all-folders', (req, res) => {
+app.get('/api/scan-all-folders', async (req, res) => {
   try {
     console.log('🔍 Starting global folder scan...');
-    
+
+    const { getData, setData } = require('./dataStore');
+    const filesDir = path.join(__dirname, 'public', 'files');
+
     const allegianceMap = {
       'stormcast-eternals': 'order',
       'cities-of-sigmar': 'order',
@@ -590,7 +593,6 @@ app.get('/api/scan-all-folders', (req, res) => {
       'fyreslayers': 'order',
       'kharadron-overlords': 'order',
       'seraphon': 'order',
-      
       'slaves-to-darkness': 'chaos',
       'khorne-bloodbound': 'chaos',
       'disciples-of-tzeentch': 'chaos',
@@ -598,107 +600,104 @@ app.get('/api/scan-all-folders', (req, res) => {
       'hedonites-of-slaanesh': 'chaos',
       'skaven': 'chaos',
       'beasts-of-chaos': 'chaos',
-      
       'nighthaunt': 'death',
       'ossiarch-bonereapers': 'death',
       'flesh-eater-courts': 'death',
       'soulblight-gravelords': 'death',
-      
       'orruk-warclans': 'destruction',
       'gloomspite-gitz': 'destruction',
       'sons-of-behemat': 'destruction',
       'ogor-mawtribes': 'destruction',
-      
-      // Others categories
       'endless-spells': 'others',
       'buildings': 'others'
     };
-    
+
     const sanitize = (str) => str.toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
-    
+
+    // 👇 Funktion zum Mergen neuer Daten in bestehende Units
+    function mergeUnitData(existingUnit, newUnit) {
+      const merged = { ...existingUnit };
+
+      // Nur ersetzen, wenn ein neues Preview-Bild da ist
+      if (newUnit.previewImage) {
+        merged.previewImage = newUnit.previewImage;
+      }
+
+      // Neue STL-Dateien hinzufügen, wenn noch nicht vorhanden
+      const existingFileNames = new Set(existingUnit.stlFiles.map(f => f.name));
+      const newFiles = newUnit.stlFiles.filter(f => !existingFileNames.has(f.name));
+      merged.stlFiles = [...existingUnit.stlFiles, ...newFiles];
+
+      return merged;
+    }
+
     const allNewUnits = {};
     let totalNewUnits = 0;
     let scannedArmies = 0;
-    
-    // Scan each army
+
     for (const [armyId, allegiance] of Object.entries(allegianceMap)) {
       const armyFolderPath = path.join(filesDir, sanitize(allegiance), sanitize(armyId));
-      
+
       if (!fs.existsSync(armyFolderPath)) {
         console.log(`⏭️ Skipping ${armyId} - folder not found`);
         continue;
       }
-      
+
       console.log(`📁 Scanning ${armyId}...`);
       scannedArmies++;
-      
+
       const newUnits = [];
       const folders = fs.readdirSync(armyFolderPath, { withFileTypes: true })
         .filter(dirent => dirent.isDirectory())
         .map(dirent => dirent.name);
-      
+
       for (const folderName of folders) {
         const unitFolderPath = path.join(armyFolderPath, folderName);
         const files = fs.readdirSync(unitFolderPath);
-        
-        // Check if folder has any files
+
         if (files.length === 0) continue;
-        
-        // Create unit name from folder name
+
         const unitName = folderName
           .split('-')
           .map(word => word.charAt(0).toUpperCase() + word.slice(1))
           .join(' ');
-        
-        // Generate unit ID
+
         const unitId = folderName;
-        
-        // Check for preview image
+
         const previewImage = files.find(file => file.toLowerCase() === 'preview.jpg');
-        const previewPath = previewImage ? 
+        const previewPath = previewImage ?
           `files/${sanitize(allegiance)}/${sanitize(armyId)}/${folderName}/preview.jpg` : '';
-        
-        // Get STL and archive files
+
         const stlFiles = files
           .filter(file => {
             const ext = path.extname(file).toLowerCase();
-              return ['.stl', '.zip', '.7z', '.rar', '.xz', '.gz'].includes(ext);
-            })
-            .map(fileName => {
+            return ['.stl', '.zip', '.7z', '.rar', '.xz', '.gz'].includes(ext);
+          })
+          .map(fileName => {
             const filePath = path.join(unitFolderPath, fileName);
-            let stats;
-        
-              try {
-              stats = fs.statSync(filePath);
-            } catch (err) {
-              console.warn(`⚠️ Fehler bei statSync für ${fileName}: ${err.message}`);
-              return null; // Datei überspringen
-            }
-
+            const stats = fs.statSync(filePath);
             return {
               name: fileName,
               size: `${(stats.size / (1024 * 1024)).toFixed(1)} MB`,
               path: `files/${sanitize(allegiance)}/${sanitize(armyId)}/${folderName}/${fileName}`
             };
-          })
-          .filter(Boolean); // Entfernt `null`-Werte
-        
-        // Only create unit if it has STL files or preview image
+          });
+
         if (stlFiles.length > 0 || previewImage) {
           const newUnit = {
             id: unitId,
             name: unitName,
-            points: 0, // Default values - user can edit later
+            points: 0,
             move: '6"',
             health: 1,
             save: '6+',
             control: 1,
             weapons: [],
             abilities: [],
-            keywords: ['Infantry'], // Default keyword
+            keywords: ['Infantry'],
             unitSize: '1',
             reinforcement: '',
             notes: `Automatisch erstellt aus Ordner: ${folderName}`,
@@ -706,25 +705,56 @@ app.get('/api/scan-all-folders', (req, res) => {
             previewImage: previewPath,
             printNotes: stlFiles.length > 0 ? 'STL-Dateien aus Ordner-Scan verfügbar' : ''
           };
-          
+
           newUnits.push(newUnit);
           totalNewUnits++;
           console.log(`  ✅ Found new unit: ${unitName} (${stlFiles.length} files)`);
         }
       }
-      
+
       if (newUnits.length > 0) {
         allNewUnits[armyId] = newUnits;
         console.log(`📦 ${armyId}: ${newUnits.length} new units`);
       }
     }
-    
+
+    // 🧠 Bestehende Daten laden
+    const existingData = await getData();
+    const updatedArmies = [];
+
+    for (const [armyId, newUnits] of Object.entries(allNewUnits)) {
+      let army = existingData.armies.find(a => a.id === armyId);
+
+      if (!army) {
+        // Neue Army
+        updatedArmies.push({ id: armyId, units: newUnits });
+      } else {
+        for (const newUnit of newUnits) {
+          const existingIndex = army.units.findIndex(u => u.id === newUnit.id);
+
+          if (existingIndex === -1) {
+            army.units.push(newUnit);
+          } else {
+            const merged = mergeUnitData(army.units[existingIndex], newUnit);
+            army.units[existingIndex] = merged;
+          }
+        }
+        updatedArmies.push(army);
+      }
+    }
+
+    // 🔄 Schreib in die Datenbank
+    await setData({
+      armies: updatedArmies,
+      otherCategories: existingData.otherCategories || []
+    });
+
     console.log(`🎉 Global scan complete: ${totalNewUnits} new units found across ${scannedArmies} armies`);
-    
-    res.json({ 
-      allNewUnits,
+
+    res.json({
       totalNewUnits,
       scannedArmies,
+      allNewUnits,
       summary: Object.entries(allNewUnits).map(([armyId, units]) => ({
         armyId,
         armyName: armyId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
@@ -732,15 +762,16 @@ app.get('/api/scan-all-folders', (req, res) => {
         unitNames: units.map(u => u.name)
       }))
     });
-    
+
   } catch (error) {
     console.error('Global folder scan error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Fehler beim globalen Ordner-Scan',
-      details: error.message 
+      details: error.message
     });
   }
 });
+
 // Storage info endpoint
 app.get('/api/storage', (req, res) => {
   try {
