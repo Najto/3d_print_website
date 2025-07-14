@@ -665,17 +665,26 @@ app.get('/api/scan-all-folders', (req, res) => {
         const stlFiles = files
           .filter(file => {
             const ext = path.extname(file).toLowerCase();
-            return ['.stl', '.zip', '.7z', '.rar', '.xz', '.gz'].includes(ext);
-          })
-          .map(fileName => {
+              return ['.stl', '.zip', '.7z', '.rar', '.xz', '.gz'].includes(ext);
+            })
+            .map(fileName => {
             const filePath = path.join(unitFolderPath, fileName);
-            const stats = fs.statSync(filePath);
+            let stats;
+        
+              try {
+              stats = fs.statSync(filePath);
+            } catch (err) {
+              console.warn(`⚠️ Fehler bei statSync für ${fileName}: ${err.message}`);
+              return null; // Datei überspringen
+            }
+
             return {
               name: fileName,
               size: `${(stats.size / (1024 * 1024)).toFixed(1)} MB`,
               path: `files/${sanitize(allegiance)}/${sanitize(armyId)}/${folderName}/${fileName}`
             };
-          });
+          })
+          .filter(Boolean); // Entfernt `null`-Werte
         
         // Only create unit if it has STL files or preview image
         if (stlFiles.length > 0 || previewImage) {
