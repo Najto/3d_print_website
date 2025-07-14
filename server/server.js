@@ -621,7 +621,6 @@ app.get('/api/scan-all-folders', async (req, res) => {
     };
 
     const updatedData = { ...dbData };
-    const allNewUnits = {};
     let totalNewUnits = 0;
 
     for (const [armyId, allegiance] of Object.entries(allegianceMap)) {
@@ -667,7 +666,14 @@ app.get('/api/scan-all-folders', async (req, res) => {
         const existingUnit = existingUnits.find(u => u.id === unitId);
 
         if (existingUnit) {
-          // Merge new files if not already present
+          const currentFileNames = stlFiles.map(f => f.name);
+
+          // Entferne veraltete Dateien
+          const originalLength = existingUnit.stlFiles.length;
+          existingUnit.stlFiles = existingUnit.stlFiles.filter(f => currentFileNames.includes(f.name));
+          const removed = originalLength - existingUnit.stlFiles.length;
+
+          // Neue Dateien ergänzen
           let addedFiles = 0;
           for (const file of stlFiles) {
             if (!existingUnit.stlFiles.some(f => f.name === file.name)) {
@@ -676,18 +682,18 @@ app.get('/api/scan-all-folders', async (req, res) => {
             }
           }
 
-          // Optional: update preview image if missing
+          // Vorschau ggf. aktualisieren
           if (!existingUnit.previewImage && previewPath) {
             existingUnit.previewImage = previewPath;
           }
 
-          if (addedFiles > 0) {
-            console.log(`🔄 Updated existing unit: ${unitName} (+${addedFiles} files)`);
+          if (addedFiles > 0 || removed > 0) {
+            console.log(`🔄 Updated unit: ${unitName} (+${addedFiles} / -${removed} files)`);
             totalNewUnits++;
           }
 
         } else {
-          // Create new unit
+          // Neue Einheit
           const newUnit = {
             id: unitId,
             name: unitName,
@@ -730,6 +736,7 @@ app.get('/api/scan-all-folders', async (req, res) => {
     res.status(500).json({ error: 'Scan failed', details: err.message });
   }
 });
+
 
 
 // Storage info endpoint
