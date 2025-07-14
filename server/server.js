@@ -621,6 +621,7 @@ app.get('/api/scan-all-folders', async (req, res) => {
     };
 
     const updatedData = { ...dbData };
+    const allNewUnits = {};
     let totalNewUnits = 0;
 
     for (const [armyId, allegiance] of Object.entries(allegianceMap)) {
