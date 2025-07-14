@@ -1,20 +1,16 @@
 // server/dataStore.js
-const path = require('path');
 const { Low } = require('lowdb');
 const { JSONFile } = require('lowdb/node');
+const path = require('path');
 
-// Speicherort der Datei
-const dataFilePath = path.join(__dirname, '../data/aos-data.json');
-const adapter = new JSONFile(dataFilePath);
-const db = new Low(adapter);
+const file = path.join(__dirname, '../data/aos-data.json');
+const adapter = new JSONFile(file);
+const defaultData = { armies: [], otherCategories: [] }; // ← das brauchst du!
+const db = new Low(adapter, defaultData); // ← Fehler war: kein defaultData
 
-// Initialisiere DB
 async function initDB() {
   await db.read();
-  db.data ||= {
-    armies: [],
-    otherCategories: []
-  };
+  db.data ||= defaultData;
   await db.write();
 }
 
@@ -29,16 +25,8 @@ async function setData(newData) {
 }
 
 async function clearData() {
-  db.data = {
-    armies: [],
-    otherCategories: []
-  };
+  db.data = defaultData;
   await db.write();
 }
 
-module.exports = {
-  initDB,
-  getData,
-  setData,
-  clearData
-};
+module.exports = { initDB, getData, setData, clearData };
