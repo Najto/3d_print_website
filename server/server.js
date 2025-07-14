@@ -576,8 +576,6 @@ app.get('/api/scan-folders/:armyId', (req, res) => {
 });
 
 // Global scan for all armies
-const { getData, setData } = require('./dataStore'); // Wichtig!
-
 app.get('/api/scan-all-folders', async (req, res) => {
   try {
     console.log('🔍 Starting global folder scan...');
