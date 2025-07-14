@@ -580,7 +580,6 @@ app.get('/api/scan-all-folders', async (req, res) => {
   try {
     console.log('🔍 Starting global folder scan...');
 
-    const { getData, setData } = require('./dataStore');
     const dbData = await getData();
 
     const sanitize = (str) => str.toLowerCase()
