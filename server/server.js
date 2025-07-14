@@ -576,14 +576,14 @@ app.get('/api/scan-folders/:armyId', (req, res) => {
 });
 
 // Global scan for all armies
+const { getData, setData } = require('./dataStore'); // Wichtig!
+
 app.get('/api/scan-all-folders', async (req, res) => {
   try {
     console.log('🔍 Starting global folder scan...');
 
-    const { getData, setData } = require('./dataStore');
-    const existingData = await getData();
-
     const allegianceMap = {
+      // Ordnung
       'stormcast-eternals': 'order',
       'cities-of-sigmar': 'order',
       'sylvaneth': 'order',
@@ -593,7 +593,7 @@ app.get('/api/scan-all-folders', async (req, res) => {
       'fyreslayers': 'order',
       'kharadron-overlords': 'order',
       'seraphon': 'order',
-      
+      // Chaos
       'slaves-to-darkness': 'chaos',
       'khorne-bloodbound': 'chaos',
       'disciples-of-tzeentch': 'chaos',
@@ -601,17 +601,17 @@ app.get('/api/scan-all-folders', async (req, res) => {
       'hedonites-of-slaanesh': 'chaos',
       'skaven': 'chaos',
       'beasts-of-chaos': 'chaos',
-      
+      // Tod
       'nighthaunt': 'death',
       'ossiarch-bonereapers': 'death',
       'flesh-eater-courts': 'death',
       'soulblight-gravelords': 'death',
-      
+      // Zerstörung
       'orruk-warclans': 'destruction',
       'gloomspite-gitz': 'destruction',
       'sons-of-behemat': 'destruction',
       'ogor-mawtribes': 'destruction',
-      
+      // Sonstiges
       'endless-spells': 'others',
       'buildings': 'others'
     };
@@ -624,18 +624,21 @@ app.get('/api/scan-all-folders', async (req, res) => {
     const mergeUnitData = (existingUnit, newUnit) => {
       const merged = { ...existingUnit };
 
-      if (newUnit.previewImage) {
+      // Aktualisiere Preview, wenn neu vorhanden
+      if (newUnit.previewImage && !existingUnit.previewImage) {
         merged.previewImage = newUnit.previewImage;
       }
 
-      const existingNames = new Set(existingUnit.stlFiles.map(f => f.name));
-      const newFiles = newUnit.stlFiles.filter(f => !existingNames.has(f.name));
+      // Neue Dateien ergänzen
+      const existingFiles = new Set(existingUnit.stlFiles.map(f => f.name));
+      const newFiles = newUnit.stlFiles.filter(f => !existingFiles.has(f.name));
       merged.stlFiles = [...existingUnit.stlFiles, ...newFiles];
 
       return merged;
     };
 
-    const allNewUnits = {};
+    const existingData = await getData();
+    const updatedArmies = [];
     let totalNewUnits = 0;
     let scannedArmies = 0;
 
@@ -649,14 +652,16 @@ app.get('/api/scan-all-folders', async (req, res) => {
       console.log(`📁 Scanning ${armyId}...`);
       scannedArmies++;
 
-      const newUnits = [];
       const folders = fs.readdirSync(armyFolderPath, { withFileTypes: true })
         .filter(dirent => dirent.isDirectory())
         .map(dirent => dirent.name);
 
+      let updatedUnits = [];
+
       for (const folderName of folders) {
         const unitFolderPath = path.join(armyFolderPath, folderName);
         const files = fs.readdirSync(unitFolderPath);
+
         if (files.length === 0) continue;
 
         const unitName = folderName
@@ -666,15 +671,14 @@ app.get('/api/scan-all-folders', async (req, res) => {
 
         const unitId = folderName;
 
-        const previewImage = files.find(file => file.toLowerCase() === 'preview.jpg');
-        const previewPath = previewImage ?
-          `files/${sanitize(allegiance)}/${sanitize(armyId)}/${folderName}/preview.jpg` : '';
+        const previewImage = files.find(f => f.toLowerCase() === 'preview.jpg');
+        const previewPath = previewImage
+          ? `files/${sanitize(allegiance)}/${sanitize(armyId)}/${folderName}/preview.jpg`
+          : '';
 
         const stlFiles = files
-          .filter(file => {
-            const ext = path.extname(file).toLowerCase();
-            return ['.stl', '.zip', '.7z', '.rar', '.xz', '.gz'].includes(ext);
-          })
+          .filter(file => ['.stl', '.zip', '.7z', '.rar', '.xz', '.gz']
+            .includes(path.extname(file).toLowerCase()))
           .map(fileName => {
             const filePath = path.join(unitFolderPath, fileName);
             const stats = fs.statSync(filePath);
@@ -685,74 +689,66 @@ app.get('/api/scan-all-folders', async (req, res) => {
             };
           });
 
-        if (stlFiles.length > 0 || previewImage) {
-          const newUnit = {
-            id: unitId,
-            name: unitName,
-            points: 0,
-            move: '6"',
-            health: 1,
-            save: '6+',
-            control: 1,
-            weapons: [],
-            abilities: [],
-            keywords: ['Infantry'],
-            unitSize: '1',
-            reinforcement: '',
-            notes: `Automatisch erstellt aus Ordner: ${folderName}`,
-            stlFiles: stlFiles,
-            previewImage: previewPath,
-            printNotes: stlFiles.length > 0 ? 'STL-Dateien aus Ordner-Scan verfügbar' : ''
-          };
+        const newUnit = {
+          id: unitId,
+          name: unitName,
+          points: 0,
+          move: '6"',
+          health: 1,
+          save: '6+',
+          control: 1,
+          weapons: [],
+          abilities: [],
+          keywords: ['Infantry'],
+          unitSize: '1',
+          reinforcement: '',
+          notes: `Automatisch erstellt aus Ordner: ${folderName}`,
+          stlFiles,
+          previewImage: previewPath,
+          printNotes: stlFiles.length > 0 ? 'STL-Dateien aus Ordner-Scan verfügbar' : ''
+        };
 
-          newUnits.push(newUnit);
+        const existingArmy = existingData.armies.find(a => a.id === armyId);
+        if (!existingArmy) {
+          updatedUnits.push(newUnit);
           totalNewUnits++;
-          console.log(`  ✅ Found new unit: ${unitName} (${stlFiles.length} files)`);
-        }
-      }
-
-      if (newUnits.length > 0) {
-        allNewUnits[armyId] = newUnits;
-        console.log(`📦 ${armyId}: ${newUnits.length} new units`);
-      }
-    }
-
-    // 🧠 Bestehende Daten aktualisieren oder ergänzen
-    const updatedArmies = [];
-
-    for (const [armyId, newUnits] of Object.entries(allNewUnits)) {
-      let army = existingData.armies.find(a => a.id === armyId);
-
-      if (!army) {
-        updatedArmies.push({ id: armyId, units: newUnits });
-      } else {
-        for (const newUnit of newUnits) {
-          const existingUnitIndex = army.units.findIndex(u => u.id === newUnit.id);
-
+          console.log(`  ✅ New unit: ${unitName} (${stlFiles.length} files)`);
+        } else {
+          const existingUnitIndex = existingArmy.units.findIndex(u => u.id === unitId);
           if (existingUnitIndex === -1) {
-            army.units.push(newUnit);
+            existingArmy.units.push(newUnit);
+            totalNewUnits++;
+            console.log(`  ➕ Added new unit to existing army: ${unitName}`);
           } else {
-            army.units[existingUnitIndex] = mergeUnitData(army.units[existingUnitIndex], newUnit);
+            const oldUnit = existingArmy.units[existingUnitIndex];
+            const merged = mergeUnitData(oldUnit, newUnit);
+            existingArmy.units[existingUnitIndex] = merged;
+            console.log(`  🔄 Updated existing unit: ${unitName}`);
           }
-        }
 
-        updatedArmies.push(army);
+          updatedUnits = existingArmy.units;
+        }
+      }
+
+      if (updatedUnits.length > 0) {
+        updatedArmies.push({ id: armyId, units: updatedUnits });
       }
     }
 
-    await setData({ armies: updatedArmies, otherCategories: [] });
+    await setData({
+      armies: updatedArmies,
+      otherCategories: existingData.otherCategories || []
+    });
 
     console.log(`🎉 Global scan complete: ${totalNewUnits} new or updated units across ${scannedArmies} armies`);
 
     res.json({
-      allNewUnits,
       totalNewUnits,
       scannedArmies,
-      summary: Object.entries(allNewUnits).map(([armyId, units]) => ({
-        armyId,
-        armyName: armyId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
-        newUnitsCount: units.length,
-        unitNames: units.map(u => u.name)
+      summary: updatedArmies.map(a => ({
+        armyId: a.id,
+        newUnitsCount: a.units.length,
+        unitNames: a.units.map(u => u.name)
       }))
     });
 
