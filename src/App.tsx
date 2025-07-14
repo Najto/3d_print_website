@@ -148,33 +148,35 @@ function App() {
     }
   };
 
-  const handleGlobalScanFolders = async () => {
-    setIsGlobalScanning(true);
-    try {
-      const result = await scanAllFoldersForNewUnits();
-      if (result.totalNewUnits > 0) {
-        addAllScannedUnits(result.allNewUnits);
-        
-        // Create detailed summary message
-        const summaryLines = [
-          `🎉 ${result.totalNewUnits} neue Einheit${result.totalNewUnits !== 1 ? 'en' : ''} aus ${result.scannedArmies} Armeen gefunden!`,
-          '',
-          ...result.summary.map(army => 
-            `📦 ${army.armyName}: ${army.newUnitsCount} Einheit${army.newUnitsCount !== 1 ? 'en' : ''}\n${army.unitNames.map(name => `   • ${name}`).join('\n')}`
-          )
-        ];
-        
-        alert(summaryLines.join('\n'));
-      } else {
-        alert(`🔍 Alle ${result.scannedArmies} Armeen gescannt - keine neuen Einheiten gefunden.`);
-      }
-    } catch (error) {
-      console.error('Global scan error:', error);
-      alert('Fehler beim globalen Ordner-Scan.');
-    } finally {
-      setIsGlobalScanning(false);
+const handleGlobalScanFolders = async () => {
+  setIsGlobalScanning(true);
+  try {
+    const result = await scanAllFoldersForNewUnits();
+    
+    // 🔁 Statt nur neue Einheiten einzeln zu mergen, lade alles neu
+    await fetchArmies(); // oder loadAllUnits()
+
+    // Optional: Zusammenfassung anzeigen
+    if (result.totalNewUnits > 0) {
+      const summaryLines = [
+        `🎉 ${result.totalNewUnits} neue Einheit${result.totalNewUnits !== 1 ? 'en' : ''} aus ${result.scannedArmies} Armeen gefunden!`,
+        '',
+        ...result.summary.map(army => 
+          `📦 ${army.armyName}: ${army.newUnitsCount} Einheit${army.newUnitsCount !== 1 ? 'en' : ''}\n${army.unitNames.map(name => `   • ${name}`).join('\n')}`
+        )
+      ];
+      alert(summaryLines.join('\n'));
+    } else {
+      alert(`🔍 Alle ${result.scannedArmies} Armeen gescannt – keine neuen Einheiten gefunden.`);
     }
-  };
+  } catch (error) {
+    console.error('Global scan error:', error);
+    alert('Fehler beim globalen Ordner-Scan.');
+  } finally {
+    setIsGlobalScanning(false);
+  }
+};
+
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
