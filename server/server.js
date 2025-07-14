@@ -729,7 +729,16 @@ app.get('/api/scan-all-folders', async (req, res) => {
     await setData(updatedData);
 
     console.log(`🎉 Global scan complete. ${totalNewUnits} units added or updated.`);
-    res.json({ message: 'Scan complete', updated: totalNewUnits });
+    res.json({
+      totalNewUnits,
+      scannedArmies: Object.keys(allegianceMap).length,
+      summary: Object.entries(allNewUnits).map(([armyId, units]) => ({
+        armyName: armyId,
+        newUnitsCount: units.length,
+        unitNames: units.map(u => u.name)
+      }))
+    });
+
 
   } catch (err) {
     console.error('❌ Scan error:', err);
