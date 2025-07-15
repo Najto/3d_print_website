@@ -152,22 +152,59 @@ const handleGlobalScanFolders = async () => {
   setIsGlobalScanning(true);
   try {
     const result = await scanAllFoldersForNewUnits();
-    
-    // 🔁 Statt nur neue Einheiten einzeln zu mergen, lade alles neu
-    await fetchArmies(); // oder loadAllUnits()
+    await fetchArmies(); // Holt die aktualisierten Daten
 
-    // Optional: Zusammenfassung anzeigen
     if (result.totalNewUnits > 0) {
+      const readableArmyNames = {
+        // Order
+        'stormcast-eternals': 'Stormcast Eternals',
+        'cities-of-sigmar': 'Cities of Sigmar',
+        'sylvaneth': 'Sylvaneth',
+        'lumineth-realm-lords': 'Lumineth Realm-lords',
+        'idoneth-deepkin': 'Idoneth Deepkin',
+        'daughters-of-khaine': 'Daughters of Khaine',
+        'fyreslayers': 'Fyreslayers',
+        'kharadron-overlords': 'Kharadron Overlords',
+        'seraphon': 'Seraphon',
+
+        // Chaos
+        'slaves-to-darkness': 'Slaves to Darkness',
+        'khorne-bloodbound': 'Blades of Khorne',
+        'disciples-of-tzeentch': 'Disciples of Tzeentch',
+        'maggotkin-of-nurgle': 'Maggotkin of Nurgle',
+        'hedonites-of-slaanesh': 'Hedonites of Slaanesh',
+        'skaven': 'Skaven',
+        'beasts-of-chaos': 'Beasts of Chaos',
+
+        // Death
+        'nighthaunt': 'Nighthaunt',
+        'ossiarch-bonereapers': 'Ossiarch Bonereapers',
+        'flesh-eater-courts': 'Flesh-eater Courts',
+        'soulblight-gravelords': 'Soulblight Gravelords',
+
+        // Destruction
+        'orruk-warclans': 'Orruk Warclans',
+        'gloomspite-gitz': 'Gloomspite Gitz',
+        'sons-of-behemat': 'Sons of Behemat',
+        'ogor-mawtribes': 'Ogor Mawtribes',
+
+        // Other
+        'endless-spells': 'Endloszauber',
+        'buildings': 'Gelände / Gebäude'
+      };
+
       const summaryLines = [
-        `🎉 ${result.totalNewUnits} neue Einheit${result.totalNewUnits !== 1 ? 'en' : ''} aus ${result.scannedArmies} Armeen gefunden!`,
+        `🎉 ${result.totalNewUnits} neue Einheit${result.totalNewUnits !== 1 ? 'en' : ''} gefunden!`,
         '',
-        ...result.summary.map(army => 
-          `📦 ${army.armyName}: ${army.newUnitsCount} Einheit${army.newUnitsCount !== 1 ? 'en' : ''}\n${army.unitNames.map(name => `   • ${name}`).join('\n')}`
-        )
+        ...result.summary.map(army => {
+          const name = readableArmyNames[army.armyName] || army.armyName;
+          return `📦 ${name}: ${army.newUnitsCount} Einheit${army.newUnitsCount !== 1 ? 'en' : ''}\n${army.unitNames.map(n => `   • ${n}`).join('\n')}`;
+        })
       ];
+
       alert(summaryLines.join('\n'));
     } else {
-      alert(`🔍 Alle ${result.scannedArmies} Armeen gescannt – keine neuen Einheiten gefunden.`);
+      alert(`🔍 ${result.scannedArmies} Armeen gescannt – keine neuen Einheiten gefunden.`);
     }
   } catch (error) {
     console.error('Global scan error:', error);
@@ -176,6 +213,7 @@ const handleGlobalScanFolders = async () => {
     setIsGlobalScanning(false);
   }
 };
+
 
   return (
     <div className="min-h-screen bg-gray-900">
