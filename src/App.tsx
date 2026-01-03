@@ -8,6 +8,8 @@ import { AoSUnitEditor } from './components/AoSUnitEditor';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { SearchBar } from './components/SearchBar';
 import { StorageDisplay } from './components/StorageDisplay';
+import AoSDataImport from './components/AoSDataImport';
+import AoSDataBrowser from './components/AoSDataBrowser';
 import { useAoSData } from './hooks/useAoSData';
 import { AoSUnit } from './types/AoSCollection';
 import { useState } from 'react';
@@ -259,6 +261,14 @@ const handleGlobalScanFolders = async () => {
             placeholder="Suche nach Einheiten, Armeen oder Schlüsselwörtern..."
           />
         </div>
+
+        {/* BSData Import Section - Only on Home */}
+        {!isSearchActive && !currentItem && (
+          <div className="space-y-8 mb-8">
+            <AoSDataImport />
+            <AoSDataBrowser />
+          </div>
+        )}
 
         {/* Breadcrumb Navigation */}
         {!isSearchActive && currentItem && (
