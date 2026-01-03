@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 const { initDB, getData, setData, clearData } = require('./dataStore');
-const { ftpService } = require('./services/ftpService');
+const { webdavService } = require('./services/webdavService');
 initDB();
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -54,7 +54,7 @@ app.delete('/api/data', async (req, res) => {
   }
 });
 
-// Configure multer for file uploads (using memory storage for FTP)
+// Configure multer for file uploads (using memory storage for WebDAV)
 const storage = multer.memoryStorage();
 
 const upload = multer({
@@ -110,12 +110,12 @@ const upload = multer({
   }
 });
 
-// Upload endpoint for multiple files (FTP version)
+// Upload endpoint for multiple files (WebDAV version)
 app.post('/api/upload', upload.fields([
   { name: 'preview', maxCount: 1 },
   { name: 'stlFiles', maxCount: 20 }
 ]), async (req, res, next) => {
-  console.log(`\n🚀 === UPLOAD REQUEST START (FTP) ===`);
+  console.log(`\n🚀 === UPLOAD REQUEST START (WebDAV) ===`);
   console.log(`📅 Timestamp: ${new Date().toISOString()}`);
   console.log(`🌐 Request URL: ${req.url}`);
   console.log(`📋 Request method: ${req.method}`);
@@ -164,10 +164,10 @@ app.post('/api/upload', upload.fields([
     // Process preview image
     if (req.files.preview && req.files.preview[0]) {
       const previewFile = req.files.preview[0];
-      console.log(`📸 Uploading preview image to FTP...`);
+      console.log(`📸 Uploading preview image to WebDAV...`);
 
       try {
-        await ftpService.uploadFile(
+        await webdavService.uploadFile(
           previewFile.buffer,
           remotePath,
           'preview.jpg'
@@ -191,7 +191,7 @@ app.post('/api/upload', upload.fields([
         });
 
         try {
-          await ftpService.uploadFile(
+          await webdavService.uploadFile(
             file.buffer,
             remotePath,
             file.originalname
@@ -240,7 +240,7 @@ app.post('/api/upload', upload.fields([
   }
 });
 
-// Download endpoint (FTP proxy)
+// Download endpoint (WebDAV proxy)
 app.get('/api/download/:allegiance/:faction/:unit/:filename', async (req, res) => {
   try {
     const { allegiance, faction, unit, filename } = req.params;
@@ -252,9 +252,9 @@ app.get('/api/download/:allegiance/:faction/:unit/:filename', async (req, res) =
 
     const remotePath = `${sanitize(allegiance)}/${sanitize(faction)}/${sanitize(unit)}/${filename}`;
 
-    console.log(`📥 Downloading file from FTP: ${remotePath}`);
+    console.log(`📥 Downloading file from WebDAV: ${remotePath}`);
 
-    const fileBuffer = await ftpService.downloadFile(remotePath);
+    const fileBuffer = await webdavService.downloadFile(remotePath);
 
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/octet-stream');
@@ -317,7 +317,7 @@ app.get('/api/download-all/:allegiance/:faction/:unit', (req, res) => {
   }
 });
 
-// Get file info endpoint (FTP version)
+// Get file info endpoint (WebDAV version)
 app.get('/api/files/:allegiance/:faction/:unit', async (req, res) => {
   try {
     const { allegiance, faction, unit } = req.params;
@@ -329,7 +329,7 @@ app.get('/api/files/:allegiance/:faction/:unit', async (req, res) => {
 
     const remotePath = `${sanitize(allegiance)}/${sanitize(faction)}/${sanitize(unit)}`;
 
-    const exists = await ftpService.directoryExists(remotePath);
+    const exists = await webdavService.directoryExists(remotePath);
 
     if (!exists) {
       return res.json({
@@ -338,7 +338,7 @@ app.get('/api/files/:allegiance/:faction/:unit', async (req, res) => {
       });
     }
 
-    const files = await ftpService.listFiles(remotePath);
+    const files = await webdavService.listFiles(remotePath);
     const fileInfo = files
       .filter(file => !file.isDirectory)
       .map(file => {
@@ -366,7 +366,7 @@ app.get('/api/files/:allegiance/:faction/:unit', async (req, res) => {
   }
 });
 
-// Delete file endpoint (FTP version)
+// Delete file endpoint (WebDAV version)
 app.delete('/api/files/:allegiance/:faction/:unit/:filename', async (req, res) => {
   try {
     const { allegiance, faction, unit, filename } = req.params;
@@ -378,7 +378,7 @@ app.delete('/api/files/:allegiance/:faction/:unit/:filename', async (req, res) =
 
     const remotePath = `${sanitize(allegiance)}/${sanitize(faction)}/${sanitize(unit)}/${filename}`;
 
-    await ftpService.deleteFile(remotePath);
+    await webdavService.deleteFile(remotePath);
     res.json({
       success: true,
       message: 'Datei erfolgreich gelöscht'
@@ -392,22 +392,22 @@ app.delete('/api/files/:allegiance/:faction/:unit/:filename', async (req, res) =
   }
 });
 
-// Health check (including FTP)
+// Health check (including WebDAV)
 app.get('/api/health', async (req, res) => {
   try {
-    const ftpHealth = await ftpService.checkHealth();
+    const ftpHealth = await webdavService.checkHealth();
     res.json({
       status: 'OK',
       message: 'Server läuft',
       timestamp: new Date().toISOString(),
-      ftp: ftpHealth
+      webdav: ftpHealth
     });
   } catch (error) {
     res.json({
       status: 'DEGRADED',
-      message: 'Server läuft, aber FTP nicht erreichbar',
+      message: 'Server läuft, aber WebDAV nicht erreichbar',
       timestamp: new Date().toISOString(),
-      ftp: {
+      webdav: {
         status: 'ERROR',
         error: error.message
       }
@@ -421,7 +421,7 @@ app.get('/files/*', async (req, res) => {
     const filePath = req.params[0];
     console.log(`🖼️ Image proxy request: ${filePath}`);
 
-    const fileBuffer = await ftpService.downloadFile(filePath);
+    const fileBuffer = await webdavService.downloadFile(filePath);
 
     const ext = path.extname(filePath).toLowerCase();
     const contentTypeMap = {
@@ -445,7 +445,7 @@ app.get('/files/*', async (req, res) => {
   }
 });
 
-// Auto-scan folders for new units (FTP version)
+// Auto-scan folders for new units (WebDAV version)
 app.get('/api/scan-folders/:armyId', async (req, res) => {
   try {
     const { armyId } = req.params;
@@ -495,19 +495,19 @@ app.get('/api/scan-folders/:armyId', async (req, res) => {
 
     const armyFolderPath = `${sanitize(allegiance)}/${sanitize(armyId)}`;
 
-    const exists = await ftpService.directoryExists(armyFolderPath);
+    const exists = await webdavService.directoryExists(armyFolderPath);
     if (!exists) {
       return res.json({ newUnits: [] });
     }
 
     const newUnits = [];
-    const folders = await ftpService.listFiles(armyFolderPath);
+    const folders = await webdavService.listFiles(armyFolderPath);
     const unitFolders = folders.filter(f => f.isDirectory);
 
     for (const folder of unitFolders) {
       const folderName = folder.name;
       const unitFolderPath = `${armyFolderPath}/${folderName}`;
-      const files = await ftpService.listFiles(unitFolderPath);
+      const files = await webdavService.listFiles(unitFolderPath);
 
       if (files.length === 0) continue;
 
@@ -573,10 +573,10 @@ app.get('/api/scan-folders/:armyId', async (req, res) => {
   }
 });
 
-// Global scan for all armies (FTP version)
+// Global scan for all armies (WebDAV version)
 app.get('/api/scan-all-folders', async (req, res) => {
   try {
-    console.log('🔍 Starting global folder scan (FTP)...');
+    console.log('🔍 Starting global folder scan (WebDAV)...');
 
     const dbData = await getData();
 
@@ -625,15 +625,15 @@ app.get('/api/scan-all-folders', async (req, res) => {
     for (const [armyId, allegiance] of Object.entries(allegianceMap)) {
       const armyFolderPath = `${sanitize(allegiance)}/${sanitize(armyId)}`;
 
-      const exists = await ftpService.directoryExists(armyFolderPath);
+      const exists = await webdavService.directoryExists(armyFolderPath);
       if (!exists) continue;
 
-      const folders = await ftpService.listFiles(armyFolderPath);
+      const folders = await webdavService.listFiles(armyFolderPath);
       const unitFolders = folders.filter(d => d.isDirectory).map(d => d.name);
 
       for (const folderName of unitFolders) {
         const unitFolderPath = `${armyFolderPath}/${folderName}`;
-        const files = await ftpService.listFiles(unitFolderPath);
+        const files = await webdavService.listFiles(unitFolderPath);
 
         if (files.length === 0) continue;
 
@@ -893,18 +893,18 @@ app.listen(PORT, async () => {
   console.log(`🌐 Frontend URL: http://localhost:5173`);
   console.log(`🔧 API URL: http://localhost:${PORT}/api`);
   console.log(`📁 Datenbank: Lokal (LowDB)`);
-  console.log(`📦 Dateispeicher: FTP-Server`);
+  console.log(`📦 Dateispeicher: WebDAV-Server`);
 
   try {
-    const ftpHealth = await ftpService.checkHealth();
+    const ftpHealth = await webdavService.checkHealth();
     if (ftpHealth.status === 'OK') {
-      console.log(`✅ FTP verbunden: ${ftpHealth.host}${ftpHealth.basePath}`);
+      console.log(`✅ WebDAV verbunden: ${ftpHealth.host}${ftpHealth.basePath}`);
     } else {
-      console.log(`⚠️  FTP nicht verbunden - bitte .env konfigurieren`);
-      console.log(`📖 Siehe server/FTP-SETUP.md für Anweisungen`);
+      console.log(`⚠️  WebDAV nicht verbunden - bitte .env konfigurieren`);
+      console.log(`📖 Siehe server/WebDAV-SETUP.md für Anweisungen`);
     }
   } catch (error) {
-    console.log(`⚠️  FTP nicht verbunden - bitte .env konfigurieren`);
-    console.log(`📖 Siehe server/FTP-SETUP.md für Anweisungen`);
+    console.log(`⚠️  WebDAV nicht verbunden - bitte .env konfigurieren`);
+    console.log(`📖 Siehe server/WebDAV-SETUP.md für Anweisungen`);
   }
 });
