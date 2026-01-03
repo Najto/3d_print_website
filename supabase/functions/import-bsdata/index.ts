@@ -143,10 +143,15 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
     });
   }
 
+  // Remove duplicates based on battlescribeId
+  const uniqueUnits = Array.from(
+    new Map(units.map(unit => [unit.battlescribeId, unit])).values()
+  );
+
   return {
     name: factionName,
     catalogFile,
-    units,
+    units: uniqueUnits,
   };
 }
 
