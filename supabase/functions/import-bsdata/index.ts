@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { XMLParser } from "npm:fast-xml-parser@4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,31 +53,52 @@ const FACTION_CATALOGS = [
 ];
 
 function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xmlText, "text/xml");
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "@_",
+  });
   
-  if (!doc) {
-    throw new Error("Failed to parse XML");
+  const parsed = parser.parse(xmlText);
+  const catalogue = parsed.catalogue;
+  
+  if (!catalogue) {
+    throw new Error("Invalid catalog format");
   }
 
-  const catalogue = doc.querySelector("catalogue");
-  const factionName = catalogue?.getAttribute("name") || catalogFile.replace(".cat", "");
-
+  const factionName = catalogue["@_name"] || catalogFile.replace(".cat", "");
   const units: UnitData[] = [];
-  const entryLinks = doc.querySelectorAll("entryLink[type='selectionEntry']");
 
-  entryLinks.forEach((entryLink) => {
-    const name = entryLink.getAttribute("name");
-    const targetId = entryLink.getAttribute("targetId");
+  // Navigate to entryLinks
+  const sharedSelectionEntries = catalogue.sharedSelectionEntries?.selectionEntry || [];
+  const selectionEntries = Array.isArray(sharedSelectionEntries) 
+    ? sharedSelectionEntries 
+    : [sharedSelectionEntries];
+
+  // Also check for entryLinks in the catalogue
+  let entryLinks = catalogue.entryLinks?.entryLink || [];
+  entryLinks = Array.isArray(entryLinks) ? entryLinks : [entryLinks];
+
+  // Process entryLinks
+  for (const entryLink of entryLinks) {
+    if (!entryLink || typeof entryLink !== 'object') continue;
     
-    if (!name || !targetId) return;
-
-    // Skip certain entries that aren't actual units
-    if (name.includes("[LEGENDS]") || name.includes("Manifestation")) return;
+    const name = entryLink["@_name"];
+    const targetId = entryLink["@_targetId"];
+    const type = entryLink["@_type"];
+    
+    if (!name || !targetId || type !== "selectionEntry") continue;
+    if (name.includes("[LEGENDS]") || name.includes("Manifestation")) continue;
 
     // Extract points cost
-    const costElement = entryLink.querySelector("cost[name='pts']");
-    const points = costElement ? parseInt(costElement.getAttribute("value") || "0") : 0;
+    let points = 0;
+    const costs = entryLink.costs?.cost;
+    if (costs) {
+      const costArray = Array.isArray(costs) ? costs : [costs];
+      const ptsCost = costArray.find((c: any) => c["@_name"] === "pts");
+      if (ptsCost && ptsCost["@_value"]) {
+        points = parseInt(ptsCost["@_value"]) || 0;
+      }
+    }
 
     units.push({
       battlescribeId: targetId,
@@ -87,7 +109,39 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
         imported: new Date().toISOString(),
       },
     });
-  });
+  }
+
+  // Process shared selection entries
+  for (const entry of selectionEntries) {
+    if (!entry || typeof entry !== 'object') continue;
+    
+    const name = entry["@_name"];
+    const id = entry["@_id"];
+    
+    if (!name || !id) continue;
+    if (name.includes("[LEGENDS]") || name.includes("Manifestation")) continue;
+
+    // Extract points cost
+    let points = 0;
+    const costs = entry.costs?.cost;
+    if (costs) {
+      const costArray = Array.isArray(costs) ? costs : [costs];
+      const ptsCost = costArray.find((c: any) => c["@_name"] === "pts");
+      if (ptsCost && ptsCost["@_value"]) {
+        points = parseInt(ptsCost["@_value"]) || 0;
+      }
+    }
+
+    units.push({
+      battlescribeId: id,
+      name: name,
+      points: points,
+      rawData: {
+        catalogFile,
+        imported: new Date().toISOString(),
+      },
+    });
+  }
 
   return {
     name: factionName,
