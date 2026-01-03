@@ -1,9 +1,11 @@
+require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 const { initDB, getData, setData, clearData } = require('./dataStore');
+const { ftpService } = require('./services/ftpService');
 initDB();
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -11,15 +13,8 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static('public'));
 
-// Ensure files directory exists
-const filesDir = path.join(__dirname, '../public/files');
-if (!fs.existsSync(filesDir)) {
-  fs.mkdirSync(filesDir, { recursive: true });
-}
-
-// Ensure data directory exists
+// Ensure data directory exists (for local database)
 const dataDir = path.join(__dirname, '../data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -59,42 +54,10 @@ app.delete('/api/data', async (req, res) => {
   }
 });
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const { allegiance, faction, unit } = req.body;
-    
-    // Sanitize folder names
-    const sanitize = (str) => str.toLowerCase()
-      .replace(/[^a-z0-9]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
-    
-    const folderPath = path.join(
-      filesDir,
-      sanitize(allegiance),
-      sanitize(faction),
-      sanitize(unit)
-    );
-    
-    // Create directory if it doesn't exist
-    fs.mkdirSync(folderPath, { recursive: true });
-    
-    cb(null, folderPath);
-  },
-  filename: (req, file, cb) => {
-    // Use original filename or default names
-    let filename = file.originalname;
-    
-    if (file.fieldname === 'preview') {
-      filename = 'preview.jpg';
-    }
-    
-    cb(null, filename);
-  }
-});
+// Configure multer for file uploads (using memory storage for FTP)
+const storage = multer.memoryStorage();
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   limits: {
     fileSize: 1024 * 1024 * 1024 // 1GB limit for ZIP archives
@@ -147,17 +110,17 @@ const upload = multer({
   }
 });
 
-// Upload endpoint for multiple files
+// Upload endpoint for multiple files (FTP version)
 app.post('/api/upload', upload.fields([
   { name: 'preview', maxCount: 1 },
   { name: 'stlFiles', maxCount: 20 }
-]), (req, res, next) => {
-  console.log(`\n🚀 === UPLOAD REQUEST START ===`);
+]), async (req, res, next) => {
+  console.log(`\n🚀 === UPLOAD REQUEST START (FTP) ===`);
   console.log(`📅 Timestamp: ${new Date().toISOString()}`);
   console.log(`🌐 Request URL: ${req.url}`);
   console.log(`📋 Request method: ${req.method}`);
   console.log(`📦 Content-Type: ${req.get('Content-Type')}`);
-  
+
   try {
     console.log('📤 Upload request body:', {
       body: req.body,
@@ -173,15 +136,15 @@ app.post('/api/upload', upload.fields([
     });
 
     const { allegiance, faction, unit } = req.body;
-    
+
     if (!allegiance || !faction || !unit) {
-      console.log('❌ Missing required fields:', { 
-        allegiance: allegiance || 'MISSING', 
-        faction: faction || 'MISSING', 
-        unit: unit || 'MISSING' 
+      console.log('❌ Missing required fields:', {
+        allegiance: allegiance || 'MISSING',
+        faction: faction || 'MISSING',
+        unit: unit || 'MISSING'
       });
-      return res.status(400).json({ 
-        error: 'Allegiance, Faction und Unit sind erforderlich' 
+      return res.status(400).json({
+        error: 'Allegiance, Faction und Unit sind erforderlich'
       });
     }
 
@@ -190,37 +153,61 @@ app.post('/api/upload', upload.fields([
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
-    const folderPath = `files/${sanitize(allegiance)}/${sanitize(faction)}/${sanitize(unit)}`;
-    
+    const remotePath = `${sanitize(allegiance)}/${sanitize(faction)}/${sanitize(unit)}`;
+    const folderPath = `files/${remotePath}`;
+
     const uploadedFiles = {
       preview: null,
       stlFiles: []
     };
 
     // Process preview image
-    if (req.files.preview) {
-      uploadedFiles.preview = `${folderPath}/preview.jpg`;
+    if (req.files.preview && req.files.preview[0]) {
+      const previewFile = req.files.preview[0];
+      console.log(`📸 Uploading preview image to FTP...`);
+
+      try {
+        await ftpService.uploadFile(
+          previewFile.buffer,
+          remotePath,
+          'preview.jpg'
+        );
+        uploadedFiles.preview = `${folderPath}/preview.jpg`;
+        console.log(`✅ Preview uploaded successfully`);
+      } catch (error) {
+        console.error(`❌ Preview upload failed:`, error.message);
+        throw new Error(`Preview-Upload fehlgeschlagen: ${error.message}`);
+      }
     }
 
-    // Process STL files with compression
+    // Process STL files
     if (req.files.stlFiles) {
       console.log(`📁 Processing ${req.files.stlFiles.length} files...`);
       for (const file of req.files.stlFiles) {
         console.log(`📄 Processing file:`, {
           original: file.originalname,
-          saved: file.filename,
           size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-          mimetype: file.mimetype,
-          path: file.path
+          mimetype: file.mimetype
         });
-        
-        uploadedFiles.stlFiles.push({
-          name: file.filename,
-          size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-          path: `${folderPath}/${file.filename}`
-        });
-        
-        console.log(`✅ File processed successfully: ${file.filename}`);
+
+        try {
+          await ftpService.uploadFile(
+            file.buffer,
+            remotePath,
+            file.originalname
+          );
+
+          uploadedFiles.stlFiles.push({
+            name: file.originalname,
+            size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+            path: `${folderPath}/${file.originalname}`
+          });
+
+          console.log(`✅ File uploaded successfully: ${file.originalname}`);
+        } catch (error) {
+          console.error(`❌ File upload failed for ${file.originalname}:`, error.message);
+          throw new Error(`Upload fehlgeschlagen für ${file.originalname}: ${error.message}`);
+        }
       }
     }
 
@@ -230,7 +217,7 @@ app.post('/api/upload', upload.fields([
       files: uploadedFiles,
       folderPath: folderPath
     };
-    
+
     console.log('✅ Upload processing completed successfully');
     console.log('📋 Response data:', responseData);
     console.log(`🏁 === UPLOAD REQUEST END ===\n`);
@@ -242,45 +229,37 @@ app.post('/api/upload', upload.fields([
     console.error('❌ Error message:', error.message);
     console.error('❌ Error stack:', error.stack);
     console.error('❌ Request body:', req.body);
-    console.error('❌ Request files:', req.files);
     console.error('❌ === END ERROR ===\n');
-    
-    // Ensure we always send a JSON response
-    const errorResponse = { 
+
+    const errorResponse = {
       error: 'Fehler beim Hochladen der Dateien',
-      details: error.message 
+      details: error.message
     };
-    
+
     res.status(500).json(errorResponse);
   }
 });
 
-// Download endpoint
-app.get('/api/download/:allegiance/:faction/:unit/:filename', (req, res) => {
+// Download endpoint (FTP proxy)
+app.get('/api/download/:allegiance/:faction/:unit/:filename', async (req, res) => {
   try {
     const { allegiance, faction, unit, filename } = req.params;
-    
+
     const sanitize = (str) => str.toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
-    const filePath = path.join(
-      filesDir,
-      sanitize(allegiance),
-      sanitize(faction),
-      sanitize(unit),
-      filename
-    );
+    const remotePath = `${sanitize(allegiance)}/${sanitize(faction)}/${sanitize(unit)}/${filename}`;
 
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Datei nicht gefunden' });
-    }
+    console.log(`📥 Downloading file from FTP: ${remotePath}`);
 
-    // Serve file directly
+    const fileBuffer = await ftpService.downloadFile(remotePath);
+
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.sendFile(filePath);
+    res.setHeader('Content-Length', fileBuffer.length);
+    res.send(fileBuffer);
 
   } catch (error) {
     console.error('Download error:', error);
@@ -338,44 +317,41 @@ app.get('/api/download-all/:allegiance/:faction/:unit', (req, res) => {
   }
 });
 
-// Get file info endpoint
-app.get('/api/files/:allegiance/:faction/:unit', (req, res) => {
+// Get file info endpoint (FTP version)
+app.get('/api/files/:allegiance/:faction/:unit', async (req, res) => {
   try {
     const { allegiance, faction, unit } = req.params;
-    
+
     const sanitize = (str) => str.toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
-    const folderPath = path.join(
-      filesDir,
-      sanitize(allegiance),
-      sanitize(faction),
-      sanitize(unit)
-    );
+    const remotePath = `${sanitize(allegiance)}/${sanitize(faction)}/${sanitize(unit)}`;
 
-    if (!fs.existsSync(folderPath)) {
+    const exists = await ftpService.directoryExists(remotePath);
+
+    if (!exists) {
       return res.json({
         exists: false,
         files: []
       });
     }
 
-    const files = fs.readdirSync(folderPath);
-    const fileInfo = files.map(filename => {
-      const filePath = path.join(folderPath, filename);
-      const stats = fs.statSync(filePath);
-      const isCompressed = filename.endsWith('.xz');
-      const displayName = isCompressed ? filename.replace('.xz', '') : filename;
-      
-      return {
-        name: displayName,
-        size: `${(stats.size / (1024 * 1024)).toFixed(1)} MB`,
-        path: `files/${sanitize(allegiance)}/${sanitize(faction)}/${sanitize(unit)}/${filename}`,
-        isPreview: filename === 'preview.jpg'
-      };
-    });
+    const files = await ftpService.listFiles(remotePath);
+    const fileInfo = files
+      .filter(file => !file.isDirectory)
+      .map(file => {
+        const isCompressed = file.name.endsWith('.xz');
+        const displayName = isCompressed ? file.name.replace('.xz', '') : file.name;
+
+        return {
+          name: displayName,
+          size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+          path: `files/${remotePath}/${file.name}`,
+          isPreview: file.name === 'preview.jpg'
+        };
+      });
 
     res.json({
       exists: true,
@@ -384,65 +360,96 @@ app.get('/api/files/:allegiance/:faction/:unit', (req, res) => {
 
   } catch (error) {
     console.error('File info error:', error);
-    res.status(500).json({ 
-      error: 'Fehler beim Abrufen der Dateiinformationen' 
+    res.status(500).json({
+      error: 'Fehler beim Abrufen der Dateiinformationen'
     });
   }
 });
 
-// Delete file endpoint
-app.delete('/api/files/:allegiance/:faction/:unit/:filename', (req, res) => {
+// Delete file endpoint (FTP version)
+app.delete('/api/files/:allegiance/:faction/:unit/:filename', async (req, res) => {
   try {
     const { allegiance, faction, unit, filename } = req.params;
-    
+
     const sanitize = (str) => str.toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
-    const filePath = path.join(
-      filesDir,
-      sanitize(allegiance),
-      sanitize(faction),
-      sanitize(unit),
-      filename
-    );
+    const remotePath = `${sanitize(allegiance)}/${sanitize(faction)}/${sanitize(unit)}/${filename}`;
 
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      res.json({ 
-        success: true, 
-        message: 'Datei erfolgreich gelöscht' 
-      });
-    } else {
-      res.status(404).json({ 
-        error: 'Datei nicht gefunden' 
-      });
-    }
+    await ftpService.deleteFile(remotePath);
+    res.json({
+      success: true,
+      message: 'Datei erfolgreich gelöscht'
+    });
 
   } catch (error) {
     console.error('Delete error:', error);
-    res.status(500).json({ 
-      error: 'Fehler beim Löschen der Datei' 
+    res.status(500).json({
+      error: 'Fehler beim Löschen der Datei'
     });
   }
 });
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'Server läuft',
-    timestamp: new Date().toISOString()
-  });
+// Health check (including FTP)
+app.get('/api/health', async (req, res) => {
+  try {
+    const ftpHealth = await ftpService.checkHealth();
+    res.json({
+      status: 'OK',
+      message: 'Server läuft',
+      timestamp: new Date().toISOString(),
+      ftp: ftpHealth
+    });
+  } catch (error) {
+    res.json({
+      status: 'DEGRADED',
+      message: 'Server läuft, aber FTP nicht erreichbar',
+      timestamp: new Date().toISOString(),
+      ftp: {
+        status: 'ERROR',
+        error: error.message
+      }
+    });
+  }
 });
 
-// Auto-scan folders for new units
-app.get('/api/scan-folders/:armyId', (req, res) => {
+// Image proxy endpoint for preview images
+app.get('/files/*', async (req, res) => {
+  try {
+    const filePath = req.params[0];
+    console.log(`🖼️ Image proxy request: ${filePath}`);
+
+    const fileBuffer = await ftpService.downloadFile(filePath);
+
+    const ext = path.extname(filePath).toLowerCase();
+    const contentTypeMap = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp'
+    };
+
+    const contentType = contentTypeMap[ext] || 'application/octet-stream';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', fileBuffer.length);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(fileBuffer);
+
+  } catch (error) {
+    console.error('Image proxy error:', error);
+    res.status(404).send('Image not found');
+  }
+});
+
+// Auto-scan folders for new units (FTP version)
+app.get('/api/scan-folders/:armyId', async (req, res) => {
   try {
     const { armyId } = req.params;
-    
-    // Get allegiance from army mapping
+
     const allegianceMap = {
       'stormcast-eternals': 'order',
       'cities-of-sigmar': 'order',
@@ -453,7 +460,7 @@ app.get('/api/scan-folders/:armyId', (req, res) => {
       'fyreslayers': 'order',
       'kharadron-overlords': 'order',
       'seraphon': 'order',
-      
+
       'slaves-to-darkness': 'chaos',
       'khorne-bloodbound': 'chaos',
       'disciples-of-tzeentch': 'chaos',
@@ -461,93 +468,84 @@ app.get('/api/scan-folders/:armyId', (req, res) => {
       'hedonites-of-slaanesh': 'chaos',
       'skaven': 'chaos',
       'beasts-of-chaos': 'chaos',
-      
+
       'nighthaunt': 'death',
       'ossiarch-bonereapers': 'death',
       'flesh-eater-courts': 'death',
       'soulblight-gravelords': 'death',
-      
+
       'orruk-warclans': 'destruction',
       'gloomspite-gitz': 'destruction',
       'sons-of-behemat': 'destruction',
       'ogor-mawtribes': 'destruction',
-      
-      // Others categories
+
       'endless-spells': 'others',
       'buildings': 'others'
     };
-    
+
     const allegiance = allegianceMap[armyId];
     if (!allegiance) {
       return res.status(400).json({ error: 'Unknown army ID' });
     }
-    
+
     const sanitize = (str) => str.toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
-    
-    const armyFolderPath = path.join(filesDir, sanitize(allegiance), sanitize(armyId));
-    
-    if (!fs.existsSync(armyFolderPath)) {
+
+    const armyFolderPath = `${sanitize(allegiance)}/${sanitize(armyId)}`;
+
+    const exists = await ftpService.directoryExists(armyFolderPath);
+    if (!exists) {
       return res.json({ newUnits: [] });
     }
-    
+
     const newUnits = [];
-    const folders = fs.readdirSync(armyFolderPath, { withFileTypes: true })
-      .filter(dirent => dirent.isDirectory())
-      .map(dirent => dirent.name);
-    
-    for (const folderName of folders) {
-      const unitFolderPath = path.join(armyFolderPath, folderName);
-      const files = fs.readdirSync(unitFolderPath);
-      
-      // Check if folder has any files
+    const folders = await ftpService.listFiles(armyFolderPath);
+    const unitFolders = folders.filter(f => f.isDirectory);
+
+    for (const folder of unitFolders) {
+      const folderName = folder.name;
+      const unitFolderPath = `${armyFolderPath}/${folderName}`;
+      const files = await ftpService.listFiles(unitFolderPath);
+
       if (files.length === 0) continue;
-      
-      // Create unit name from folder name
+
       const unitName = folderName
         .split('-')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
-      
-      // Generate unit ID
+
       const unitId = folderName;
-      
-      // Check for preview image
-      const previewImage = files.find(file => file.toLowerCase() === 'preview.jpg');
-      const previewPath = previewImage ? 
-        `files/${sanitize(allegiance)}/${sanitize(armyId)}/${folderName}/preview.jpg` : '';
-      
-      // Get STL and archive files
+
+      const previewImage = files.find(file => file.name.toLowerCase() === 'preview.jpg');
+      const previewPath = previewImage
+        ? `files/${armyFolderPath}/${folderName}/preview.jpg`
+        : '';
+
       const stlFiles = files
         .filter(file => {
-          const ext = path.extname(file).toLowerCase();
+          const ext = path.extname(file.name).toLowerCase();
           return ['.stl', '.zip', '.7z', '.rar', '.xz', '.gz'].includes(ext);
         })
-        .map(fileName => {
-          const filePath = path.join(unitFolderPath, fileName);
-          const stats = fs.statSync(filePath);
-          return {
-            name: fileName,
-            size: `${(stats.size / (1024 * 1024)).toFixed(1)} MB`,
-            path: `files/${sanitize(allegiance)}/${sanitize(armyId)}/${folderName}/${fileName}`
-          };
-        });
-      
-      // Only create unit if it has STL files or preview image
+        .map(file => ({
+          name: file.name,
+          size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+          path: `files/${armyFolderPath}/${folderName}/${file.name}`
+        }));
+
       if (stlFiles.length > 0 || previewImage) {
         const newUnit = {
           id: unitId,
           name: unitName,
-          points: 0, // Default values - user can edit later
+          points: 0,
           move: '6"',
           health: 1,
           save: '6+',
           control: 1,
           weapons: [],
           abilities: [],
-          keywords: ['Infantry'], // Default keyword
+          keywords: ['Infantry'],
           unitSize: '1',
           reinforcement: '',
           notes: `Automatisch erstellt aus Ordner: ${folderName}`,
@@ -555,30 +553,30 @@ app.get('/api/scan-folders/:armyId', (req, res) => {
           previewImage: previewPath,
           printNotes: stlFiles.length > 0 ? 'STL-Dateien aus Ordner-Scan verfügbar' : ''
         };
-        
+
         newUnits.push(newUnit);
       }
     }
-    
-    res.json({ 
+
+    res.json({
       newUnits,
       scannedPath: armyFolderPath,
-      foundFolders: folders.length
+      foundFolders: unitFolders.length
     });
-    
+
   } catch (error) {
     console.error('Folder scan error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Fehler beim Scannen der Ordner',
-      details: error.message 
+      details: error.message
     });
   }
 });
 
-// Global scan for all armies
+// Global scan for all armies (FTP version)
 app.get('/api/scan-all-folders', async (req, res) => {
   try {
-    console.log('🔍 Starting global folder scan...');
+    console.log('🔍 Starting global folder scan (FTP)...');
 
     const dbData = await getData();
 
@@ -625,17 +623,17 @@ app.get('/api/scan-all-folders', async (req, res) => {
     let totalNewUnits = 0;
 
     for (const [armyId, allegiance] of Object.entries(allegianceMap)) {
-      const armyFolderPath = path.join(filesDir, sanitize(allegiance), sanitize(armyId));
+      const armyFolderPath = `${sanitize(allegiance)}/${sanitize(armyId)}`;
 
-      if (!fs.existsSync(armyFolderPath)) continue;
+      const exists = await ftpService.directoryExists(armyFolderPath);
+      if (!exists) continue;
 
-      const folders = fs.readdirSync(armyFolderPath, { withFileTypes: true })
-        .filter(d => d.isDirectory())
-        .map(d => d.name);
+      const folders = await ftpService.listFiles(armyFolderPath);
+      const unitFolders = folders.filter(d => d.isDirectory).map(d => d.name);
 
-      for (const folderName of folders) {
-        const unitFolderPath = path.join(armyFolderPath, folderName);
-        const files = fs.readdirSync(unitFolderPath);
+      for (const folderName of unitFolders) {
+        const unitFolderPath = `${armyFolderPath}/${folderName}`;
+        const files = await ftpService.listFiles(unitFolderPath);
 
         if (files.length === 0) continue;
 
@@ -645,36 +643,29 @@ app.get('/api/scan-all-folders', async (req, res) => {
           .join(' ');
 
         const unitId = folderName;
-        const previewImage = files.find(file => file.toLowerCase() === 'preview.jpg');
+        const previewImage = files.find(file => file.name.toLowerCase() === 'preview.jpg');
         const previewPath = previewImage
-          ? `files/${sanitize(allegiance)}/${sanitize(armyId)}/${folderName}/preview.jpg`
+          ? `files/${armyFolderPath}/${folderName}/preview.jpg`
           : '';
 
         const stlFiles = files
-          .filter(file => ['.stl', '.zip', '.7z', '.rar', '.xz', '.gz'].includes(path.extname(file).toLowerCase()))
-          .map(fileName => {
-            const filePath = path.join(unitFolderPath, fileName);
-            const stats = fs.statSync(filePath);
-            return {
-              name: fileName,
-              size: `${(stats.size / (1024 * 1024)).toFixed(1)} MB`,
-              path: `files/${sanitize(allegiance)}/${sanitize(armyId)}/${folderName}/${fileName}`
-            };
-          });
+          .filter(file => ['.stl', '.zip', '.7z', '.rar', '.xz', '.gz'].includes(path.extname(file.name).toLowerCase()))
+          .map(file => ({
+            name: file.name,
+            size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+            path: `files/${armyFolderPath}/${folderName}/${file.name}`
+          }));
 
         const existingUnits = updatedData.armies.find(a => a.id === armyId)?.units || [];
-
         const existingUnit = existingUnits.find(u => u.id === unitId);
 
         if (existingUnit) {
           const currentFileNames = stlFiles.map(f => f.name);
 
-          // Entferne veraltete Dateien
           const originalLength = existingUnit.stlFiles.length;
           existingUnit.stlFiles = existingUnit.stlFiles.filter(f => currentFileNames.includes(f.name));
           const removed = originalLength - existingUnit.stlFiles.length;
 
-          // Neue Dateien ergänzen
           let addedFiles = 0;
           for (const file of stlFiles) {
             if (!existingUnit.stlFiles.some(f => f.name === file.name)) {
@@ -683,7 +674,6 @@ app.get('/api/scan-all-folders', async (req, res) => {
             }
           }
 
-          // Vorschau ggf. aktualisieren
           if (!existingUnit.previewImage && previewPath) {
             existingUnit.previewImage = previewPath;
           }
@@ -694,7 +684,6 @@ app.get('/api/scan-all-folders', async (req, res) => {
           }
 
         } else {
-          // Neue Einheit
           const newUnit = {
             id: unitId,
             name: unitName,
@@ -721,6 +710,11 @@ app.get('/api/scan-all-folders', async (req, res) => {
           const armyEntry = updatedData.armies.find(a => a.id === armyId);
           armyEntry.units.push(newUnit);
 
+          if (!allNewUnits[armyId]) {
+            allNewUnits[armyId] = [];
+          }
+          allNewUnits[armyId].push(newUnit);
+
           console.log(`✅ Found new unit: ${unitName} (${stlFiles.length} files)`);
           totalNewUnits++;
         }
@@ -739,7 +733,6 @@ app.get('/api/scan-all-folders', async (req, res) => {
         unitNames: units.map(u => u.name)
       }))
     });
-
 
   } catch (err) {
     console.error('❌ Scan error:', err);
@@ -895,9 +888,23 @@ app.use((error, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Server läuft auf Port ${PORT}`);
-  console.log(`📁 Dateien werden gespeichert in: ${filesDir}`);
   console.log(`🌐 Frontend URL: http://localhost:5173`);
   console.log(`🔧 API URL: http://localhost:${PORT}/api`);
+  console.log(`📁 Datenbank: Lokal (LowDB)`);
+  console.log(`📦 Dateispeicher: FTP-Server`);
+
+  try {
+    const ftpHealth = await ftpService.checkHealth();
+    if (ftpHealth.status === 'OK') {
+      console.log(`✅ FTP verbunden: ${ftpHealth.host}${ftpHealth.basePath}`);
+    } else {
+      console.log(`⚠️  FTP nicht verbunden - bitte .env konfigurieren`);
+      console.log(`📖 Siehe server/FTP-SETUP.md für Anweisungen`);
+    }
+  } catch (error) {
+    console.log(`⚠️  FTP nicht verbunden - bitte .env konfigurieren`);
+    console.log(`📖 Siehe server/FTP-SETUP.md für Anweisungen`);
+  }
 });

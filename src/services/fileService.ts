@@ -218,7 +218,7 @@ class FileService {
   }
   
   getDownloadUrl(filePath: string): string {
-    return `/${filePath}`;
+    return `http://localhost:3001/${filePath}`;
   }
 }
 
