@@ -1,64 +1,95 @@
 import { useState, useEffect } from 'react';
 import { AoSGameData, AoSUnit, AoSArmy } from '../types/AoSCollection';
 import { aosGameData as initialData } from '../data/aosData';
+import { aosDatabaseService } from '../services/aosDatabaseService';
 
 const STORAGE_KEY = 'aos_custom_data';
 const API_BASE_URL = '/api';
 
 export function useAoSData() {
   const [gameData, setGameData] = useState<AoSGameData>(initialData);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load custom data from server and localStorage on mount
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
     try {
-      // Try to load from server first
+      setIsLoading(true);
+
+      const databaseData = await aosDatabaseService.loadArmiesFromDatabase();
+
       const response = await fetch(`${API_BASE_URL}/data`);
       if (response.ok) {
         const serverData = await response.json();
-        const mergedData = mergeWithInitialData(serverData);
+        const mergedData = mergeWithDatabaseData(databaseData, serverData);
         setGameData(mergedData);
         return;
       }
-    } catch (error) {
-      console.log('Server data not available, trying localStorage...');
-    }
 
-    // Fallback to localStorage
-    const savedData = localStorage.getItem(STORAGE_KEY);
-    if (savedData) {
-      try {
-        const customData = JSON.parse(savedData);
-        const mergedData = mergeWithInitialData(customData);
-        setGameData(mergedData);
-      } catch (error) {
-        console.error('Error loading localStorage data:', error);
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        try {
+          const customData = JSON.parse(savedData);
+          const mergedData = mergeWithDatabaseData(databaseData, customData);
+          setGameData(mergedData);
+        } catch (error) {
+          console.error('Error loading localStorage data:', error);
+          setGameData(databaseData);
+        }
+      } else {
+        setGameData(databaseData);
       }
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setGameData(initialData);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const mergeWithInitialData = (customData: any) => {
+  const mergeWithDatabaseData = (databaseData: AoSGameData, customData: any) => {
     return {
-      ...initialData,
-      armies: initialData.armies.map(army => {
+      ...databaseData,
+      armies: databaseData.armies.map(army => {
         const customArmy = customData.armies?.find((a: AoSArmy) => a.id === army.id);
-        if (customArmy) {
+        if (customArmy && customArmy.units && customArmy.units.length > 0) {
+          const mergedUnits = [...army.units];
+
+          customArmy.units.forEach((customUnit: AoSUnit) => {
+            const existingIndex = mergedUnits.findIndex(u => u.id === customUnit.id);
+            if (existingIndex >= 0) {
+              mergedUnits[existingIndex] = customUnit;
+            } else {
+              mergedUnits.push(customUnit);
+            }
+          });
+
           return {
             ...army,
-            units: customArmy.units
+            units: mergedUnits
           };
         }
         return army;
       }),
-      otherCategories: initialData.otherCategories?.map(category => {
+      otherCategories: databaseData.otherCategories?.map(category => {
         const customCategory = customData.otherCategories?.find((c: AoSArmy) => c.id === category.id);
-        if (customCategory) {
+        if (customCategory && customCategory.units && customCategory.units.length > 0) {
+          const mergedUnits = [...category.units];
+
+          customCategory.units.forEach((customUnit: AoSUnit) => {
+            const existingIndex = mergedUnits.findIndex(u => u.id === customUnit.id);
+            if (existingIndex >= 0) {
+              mergedUnits[existingIndex] = customUnit;
+            } else {
+              mergedUnits.push(customUnit);
+            }
+          });
+
           return {
             ...category,
-            units: customCategory.units
+            units: mergedUnits
           };
         }
         return category;
@@ -298,12 +329,14 @@ export function useAoSData() {
   };
   return {
     gameData,
+    isLoading,
     updateUnit,
     deleteUnit,
     resetToDefault,
     scanFoldersForNewUnits,
     scanAllFoldersForNewUnits,
     addScannedUnits,
-    addAllScannedUnits
+    addAllScannedUnits,
+    reloadData: loadData
   };
 }

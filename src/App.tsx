@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sword, Search, Home, ChevronRight, ArrowLeft, Plus, Sparkles } from 'lucide-react';
+import { Sword, Search, Home, ChevronRight, ArrowLeft, Plus, Sparkles, Settings as SettingsIcon } from 'lucide-react';
 import { AllegianceCard } from './components/AllegianceCard';
 import { AoSArmyCard } from './components/AoSArmyCard';
 import { AoSUnitCard } from './components/AoSUnitCard';
@@ -8,15 +8,14 @@ import { AoSUnitEditor } from './components/AoSUnitEditor';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { SearchBar } from './components/SearchBar';
 import { StorageDisplay } from './components/StorageDisplay';
-import AoSDataImport from './components/AoSDataImport';
-import AoSDataBrowser from './components/AoSDataBrowser';
+import Settings from './components/Settings';
 import { useAoSData } from './hooks/useAoSData';
 import { AoSUnit } from './types/AoSCollection';
 import { useState } from 'react';
 import { cleanupOldFiles } from './utils/fileUtils';
 
 function App() {
-  const { gameData: aosGameData, updateUnit, deleteUnit, scanFoldersForNewUnits, scanAllFoldersForNewUnits, addScannedUnits, addAllScannedUnits } = useAoSData();
+  const { gameData: aosGameData, isLoading, updateUnit, deleteUnit, scanFoldersForNewUnits, scanAllFoldersForNewUnits, addScannedUnits, addAllScannedUnits, reloadData } = useAoSData();
   const [selectedArmy, setSelectedArmy] = useState<string | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<AoSUnit | null>(null);
   const [editingUnit, setEditingUnit] = useState<AoSUnit | null>(null);
@@ -26,6 +25,7 @@ function App() {
   const [unitToDelete, setUnitToDelete] = useState<AoSUnit | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isGlobalScanning, setIsGlobalScanning] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   
   // Cleanup old files on app start
   React.useEffect(() => {
@@ -154,7 +154,6 @@ const handleGlobalScanFolders = async () => {
   setIsGlobalScanning(true);
   try {
     const result = await scanAllFoldersForNewUnits();
-    await fetchArmies(); // Holt die aktualisierten Daten
 
     if (result.totalNewUnits > 0) {
       const readableArmyNames = {
@@ -217,6 +216,26 @@ const handleGlobalScanFolders = async () => {
 };
 
 
+  if (showSettings) {
+    return (
+      <Settings
+        onBack={() => setShowSettings(false)}
+        onDataUpdated={() => reloadData()}
+      />
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-yellow-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white text-lg">Lade Daten...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
@@ -232,13 +251,13 @@ const handleGlobalScanFolders = async () => {
                 <p className="text-gray-400 text-sm">4. Edition - Armeen & 3D-Druckdateien</p>
               </div>
             </div>
-            
-            {/* Global Scan Button */}
+
+            {/* Action Buttons */}
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleGlobalScanFolders}
                 disabled={isGlobalScanning}
-                className="bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+                className="bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
               >
                 {isGlobalScanning ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -246,6 +265,14 @@ const handleGlobalScanFolders = async () => {
                   <Search className="w-4 h-4" />
                 )}
                 <span>{isGlobalScanning ? 'Scanne alle...' : 'Alle Ordner scannen'}</span>
+              </button>
+
+              <button
+                onClick={() => setShowSettings(true)}
+                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+              >
+                <SettingsIcon className="w-4 h-4" />
+                <span>Einstellungen</span>
               </button>
             </div>
           </div>
@@ -261,14 +288,6 @@ const handleGlobalScanFolders = async () => {
             placeholder="Suche nach Einheiten, Armeen oder Schlüsselwörtern..."
           />
         </div>
-
-        {/* BSData Import Section - Only on Home */}
-        {!isSearchActive && !currentItem && (
-          <div className="space-y-8 mb-8">
-            <AoSDataImport />
-            <AoSDataBrowser />
-          </div>
-        )}
 
         {/* Breadcrumb Navigation */}
         {!isSearchActive && currentItem && (

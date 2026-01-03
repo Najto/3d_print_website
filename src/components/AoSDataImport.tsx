@@ -15,7 +15,11 @@ interface ImportStats {
   }[];
 }
 
-export default function AoSDataImport() {
+interface AoSDataImportProps {
+  onImportComplete?: () => void;
+}
+
+export default function AoSDataImport({ onImportComplete }: AoSDataImportProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +32,9 @@ export default function AoSDataImport() {
     try {
       const result = await aosImportService.importAllFactions();
       setImportStats(result);
+      if (onImportComplete) {
+        onImportComplete();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import fehlgeschlagen');
     } finally {
