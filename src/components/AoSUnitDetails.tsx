@@ -34,7 +34,7 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
                 <span>Bearbeiten</span>
               </button>
             )}
-            {onDelete && (
+            {onDelete && unit.isCustom && (
               <button
                 onClick={() => onDelete(unit)}
                 className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"

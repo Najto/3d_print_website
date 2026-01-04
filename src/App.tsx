@@ -5,17 +5,20 @@ import { AoSArmyCard } from './components/AoSArmyCard';
 import { AoSUnitCard } from './components/AoSUnitCard';
 import { AoSUnitDetails } from './components/AoSUnitDetails';
 import { AoSUnitEditor } from './components/AoSUnitEditor';
+import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { SearchBar } from './components/SearchBar';
 import Settings from './components/Settings';
 import { useAoSData } from './hooks/useAoSData';
 import { AoSUnit } from './types/AoSCollection';
 
 function App() {
-  const { gameData, isLoading, updateUnit, reloadData } = useAoSData();
+  const { gameData, isLoading, updateUnit, deleteUnit, reloadData } = useAoSData();
   const [selectedFactionId, setSelectedFactionId] = useState<string | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<AoSUnit | null>(null);
   const [editingUnit, setEditingUnit] = useState<AoSUnit | null>(null);
   const [editingArmyId, setEditingArmyId] = useState<string>('');
+  const [deletingUnit, setDeletingUnit] = useState<AoSUnit | null>(null);
+  const [deletingArmyId, setDeletingArmyId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showSettings, setShowSettings] = useState(false);
 
@@ -74,6 +77,29 @@ function App() {
   const handleCreateCustomUnit = (armyId: string) => {
     setEditingUnit(null);
     setEditingArmyId(armyId);
+  };
+
+  const handleDeleteUnit = (unit: AoSUnit, armyId: string) => {
+    if (!unit.isCustom) {
+      alert('Nur Custom Units können gelöscht werden!');
+      return;
+    }
+    setDeletingUnit(unit);
+    setDeletingArmyId(armyId);
+    setSelectedUnit(null);
+  };
+
+  const confirmDeleteUnit = async () => {
+    if (deletingUnit && deletingArmyId) {
+      await deleteUnit(deletingArmyId, deletingUnit.id);
+      setDeletingUnit(null);
+      setDeletingArmyId('');
+    }
+  };
+
+  const cancelDeleteUnit = () => {
+    setDeletingUnit(null);
+    setDeletingArmyId('');
   };
 
   if (showSettings) {
@@ -253,8 +279,8 @@ function App() {
                       key={unit.id}
                       unit={unit}
                       onViewDetails={handleUnitClick}
-                      onEdit={() => {}}
-                      onDelete={() => {}}
+                      onEdit={() => handleEditUnit(unit, selectedFaction.id)}
+                      onDelete={() => handleDeleteUnit(unit, selectedFaction.id)}
                     />
                   ))}
               </div>
@@ -264,15 +290,20 @@ function App() {
 
         {isSearchActive && searchResults.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {searchResults.map((unit: any) => (
-              <AoSUnitCard
-                key={unit.id}
-                unit={unit}
-                onViewDetails={handleUnitClick}
-                onEdit={() => {}}
-                onDelete={() => {}}
-              />
-            ))}
+            {searchResults.map((unit: any) => {
+              const army = gameData.armies.find(a =>
+                a.units.some(u => u.id === unit.id)
+              );
+              return (
+                <AoSUnitCard
+                  key={unit.id}
+                  unit={unit}
+                  onViewDetails={handleUnitClick}
+                  onEdit={() => army && handleEditUnit(unit, army.id)}
+                  onDelete={() => army && handleDeleteUnit(unit, army.id)}
+                />
+              );
+            })}
           </div>
         )}
 
@@ -298,7 +329,13 @@ function App() {
               )?.id || '';
             handleEditUnit(unit, armyId);
           }}
-          onDelete={() => {}}
+          onDelete={(unit) => {
+            const armyId = selectedFactionId ||
+              gameData.armies.find(army =>
+                army.units.some(u => u.id === unit.id)
+              )?.id || '';
+            handleDeleteUnit(unit, armyId);
+          }}
         />
       )}
 
@@ -308,6 +345,14 @@ function App() {
           armyId={editingArmyId}
           onSave={handleSaveUnit}
           onClose={handleCloseEditor}
+        />
+      )}
+
+      {deletingUnit && (
+        <DeleteConfirmationModal
+          unit={deletingUnit}
+          onConfirm={confirmDeleteUnit}
+          onCancel={cancelDeleteUnit}
         />
       )}
 
