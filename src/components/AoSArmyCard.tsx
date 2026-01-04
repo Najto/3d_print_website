@@ -57,7 +57,7 @@ export function AoSArmyCard({ army, onClick }: AoSArmyCardProps) {
         </div>
         <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-yellow-400 transition-colors" />
       </div>
-      
+      {/*}
       <div className="mb-4">
         <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm text-white ${getAllegianceColor(army.allegiance)}`}>
           {army.allegiance}
@@ -74,5 +74,6 @@ export function AoSArmyCard({ army, onClick }: AoSArmyCardProps) {
         </div>
       )}
     </div>
+    {*/}
   );
 }
