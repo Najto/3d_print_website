@@ -18,7 +18,7 @@ export function useAoSData() {
       setIsLoading(true);
 
       const databaseData = await aosDatabaseService.loadArmiesFromDatabase();
-      const customDataMap = await aosDatabaseService.loadCustomUnitData();
+      const { customDataMap } = await aosDatabaseService.loadCustomUnitData();
 
       const mergedData = mergeWithCustomData(databaseData, customDataMap);
       setGameData(mergedData);
@@ -89,7 +89,19 @@ export function useAoSData() {
         previewImage: unit.previewImage,
         printNotes: unit.printNotes,
         notes: unit.notes,
-        isCustom: unit.isCustom
+        isCustom: unit.isCustom,
+        name: unit.name,
+        points: unit.points,
+        move: unit.move,
+        health: unit.health,
+        save: unit.save,
+        control: unit.control,
+        baseSize: unit.baseSize,
+        unitSize: unit.unitSize,
+        reinforcement: unit.reinforcement,
+        weapons: unit.weapons,
+        abilities: unit.abilities,
+        keywords: unit.keywords
       };
 
       await aosDatabaseService.saveCustomUnitData(factionId, unit.id, customData);

@@ -89,6 +89,9 @@ export const aosDatabaseService = {
         console.error('Error loading units:', unitsError);
       }
 
+      // Load custom units and custom data
+      const { customUnitsMap } = await this.loadCustomUnitData();
+
       console.log(`📊 Loaded ${factions.length} factions from database`);
       console.log(`📊 Loaded ${units?.length || 0} units from database`);
 
@@ -112,9 +115,13 @@ export const aosDatabaseService = {
       }
 
       // Convert database factions to AoS armies
-      const armies: AoSArmy[] = factions.map(faction =>
-        this.convertFactionToArmy(faction, unitsByFaction.get(faction.id) || [])
-      );
+      const armies: AoSArmy[] = factions.map(faction => {
+        const armyId = faction.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+        const officialUnits = unitsByFaction.get(faction.id) || [];
+        const customUnits = customUnitsMap.get(armyId) || [];
+
+        return this.convertFactionToArmy(faction, officialUnits, customUnits);
+      });
 
       // Generate allegiance groups dynamically from factions
       const allegianceGroups = this.generateAllegianceGroups(factions, armies);
@@ -136,7 +143,7 @@ export const aosDatabaseService = {
     }
   },
 
-  convertFactionToArmy(faction: DbFaction, units: DbUnit[]): AoSArmy {
+  convertFactionToArmy(faction: DbFaction, units: DbUnit[], customUnits: AoSUnit[] = []): AoSArmy {
     // Generate army ID from faction name
     const armyId = faction.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
 
@@ -170,6 +177,9 @@ export const aosDatabaseService = {
       };
     });
 
+    // Combine official units with custom units
+    const allUnits = [...aosUnits, ...customUnits];
+
     return {
       id: armyId,
       name: faction.name,
@@ -179,7 +189,7 @@ export const aosDatabaseService = {
       commandTraits: [],
       artefacts: [],
       spells: [],
-      units: aosUnits
+      units: allUnits
     };
   },
 
@@ -238,6 +248,19 @@ export const aosDatabaseService = {
     previewImage?: string;
     printNotes?: string;
     notes?: string;
+    isCustom?: boolean;
+    name?: string;
+    points?: number;
+    move?: string;
+    health?: number;
+    save?: string;
+    control?: number;
+    baseSize?: string;
+    unitSize?: string;
+    reinforcement?: string;
+    weapons?: any[];
+    abilities?: any[];
+    keywords?: string[];
   }): Promise<boolean> {
     try {
       const { data: existing } = await supabase
@@ -248,32 +271,50 @@ export const aosDatabaseService = {
         .is('user_id', null)
         .maybeSingle();
 
+      const isCustomUnit = customData.isCustom || false;
+
+      const updateData: any = {
+        stl_files: customData.stlFiles || [],
+        preview_image: customData.previewImage || null,
+        print_notes: customData.printNotes || null,
+        notes: customData.notes || null,
+        is_custom: isCustomUnit,
+        updated_at: new Date().toISOString()
+      };
+
+      if (isCustomUnit) {
+        updateData.name = customData.name || null;
+        updateData.points = customData.points || 0;
+        updateData.move = customData.move || null;
+        updateData.health = customData.health || null;
+        updateData.save = customData.save || null;
+        updateData.control = customData.control || null;
+        updateData.base_size = customData.baseSize || null;
+        updateData.unit_size = customData.unitSize || null;
+        updateData.reinforcement = customData.reinforcement || null;
+        updateData.weapons = customData.weapons || [];
+        updateData.abilities = customData.abilities || [];
+        updateData.keywords = customData.keywords || [];
+      }
+
       let result;
       if (existing) {
         result = await supabase
           .from('aos_custom_unit_data')
-          .update({
-            stl_files: customData.stlFiles || [],
-            preview_image: customData.previewImage || null,
-            print_notes: customData.printNotes || null,
-            notes: customData.notes || null,
-            is_custom: customData.isCustom || false,
-            updated_at: new Date().toISOString()
-          })
+          .update(updateData)
           .eq('id', existing.id);
       } else {
+        const insertData = {
+          faction_id: factionId,
+          unit_id: unitId,
+          user_id: null,
+          ...updateData
+        };
+        delete insertData.updated_at;
+
         result = await supabase
           .from('aos_custom_unit_data')
-          .insert({
-            faction_id: factionId,
-            unit_id: unitId,
-            user_id: null,
-            stl_files: customData.stlFiles || [],
-            preview_image: customData.previewImage || null,
-            print_notes: customData.printNotes || null,
-            notes: customData.notes || null,
-            is_custom: customData.isCustom || false
-          });
+          .insert(insertData);
       }
 
       if (result.error) {
@@ -281,7 +322,7 @@ export const aosDatabaseService = {
         return false;
       }
 
-      console.log('✅ Custom unit data saved to Supabase');
+      console.log(`✅ ${isCustomUnit ? 'Custom unit' : 'Custom unit data'} saved to Supabase`);
       return true;
     } catch (error) {
       console.error('Error in saveCustomUnitData:', error);
@@ -289,7 +330,10 @@ export const aosDatabaseService = {
     }
   },
 
-  async loadCustomUnitData(): Promise<Map<string, Map<string, any>>> {
+  async loadCustomUnitData(): Promise<{
+    customDataMap: Map<string, Map<string, any>>;
+    customUnitsMap: Map<string, AoSUnit[]>;
+  }> {
     try {
       const { data, error } = await supabase
         .from('aos_custom_unit_data')
@@ -298,33 +342,66 @@ export const aosDatabaseService = {
 
       if (error) {
         console.error('Error loading custom unit data:', error);
-        return new Map();
+        return { customDataMap: new Map(), customUnitsMap: new Map() };
       }
 
       const customDataMap = new Map<string, Map<string, any>>();
+      const customUnitsMap = new Map<string, AoSUnit[]>();
 
       if (data) {
         data.forEach(row => {
-          if (!customDataMap.has(row.faction_id)) {
-            customDataMap.set(row.faction_id, new Map());
-          }
+          if (row.is_custom) {
+            if (!customUnitsMap.has(row.faction_id)) {
+              customUnitsMap.set(row.faction_id, []);
+            }
 
-          customDataMap.get(row.faction_id)!.set(row.unit_id, {
-            stlFiles: row.stl_files || [],
-            previewImage: row.preview_image || '',
-            printNotes: row.print_notes || '',
-            notes: row.notes || '',
-            isCustom: row.is_custom || false
-          });
+            const customUnit: AoSUnit = {
+              id: row.unit_id,
+              name: row.name || 'Unnamed Unit',
+              points: row.points || 0,
+              move: row.move || undefined,
+              health: row.health || undefined,
+              save: row.save || undefined,
+              control: row.control || undefined,
+              baseSize: row.base_size || undefined,
+              unitSize: row.unit_size || '1',
+              reinforcement: row.reinforcement || undefined,
+              weapons: row.weapons || [],
+              abilities: row.abilities || [],
+              keywords: row.keywords || [],
+              stlFiles: row.stl_files || [],
+              previewImage: row.preview_image || '',
+              printNotes: row.print_notes || '',
+              notes: row.notes || '',
+              isCustom: true
+            };
+
+            customUnitsMap.get(row.faction_id)!.push(customUnit);
+          } else {
+            if (!customDataMap.has(row.faction_id)) {
+              customDataMap.set(row.faction_id, new Map());
+            }
+
+            customDataMap.get(row.faction_id)!.set(row.unit_id, {
+              stlFiles: row.stl_files || [],
+              previewImage: row.preview_image || '',
+              printNotes: row.print_notes || '',
+              notes: row.notes || '',
+              isCustom: false
+            });
+          }
         });
 
-        console.log(`✅ Loaded custom data for ${data.length} units from Supabase`);
+        const customUnitCount = Array.from(customUnitsMap.values()).reduce((sum, units) => sum + units.length, 0);
+        const enhancementCount = data.length - customUnitCount;
+
+        console.log(`✅ Loaded ${customUnitCount} custom units and ${enhancementCount} enhancement data entries from Supabase`);
       }
 
-      return customDataMap;
+      return { customDataMap, customUnitsMap };
     } catch (error) {
       console.error('Error in loadCustomUnitData:', error);
-      return new Map();
+      return { customDataMap: new Map(), customUnitsMap: new Map() };
     }
   },
 
