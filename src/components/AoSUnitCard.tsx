@@ -29,31 +29,29 @@ export function AoSUnitCard({ unit, onViewDetails, onEdit, onDelete }: AoSUnitCa
   return (
     <div className="bg-gray-800 rounded-lg overflow-hidden hover:shadow-2xl transition-all duration-300 group border border-gray-700 hover:border-yellow-500">
       {/* Preview Image */}
-      {unit.previewImage && (
-        <div className="relative h-48 bg-gray-900 overflow-hidden">
-          <img
-            src={unit.previewImage}
-            alt={unit.name}
-            className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${
-              imageLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
-            onLoad={() => setImageLoaded(true)}
-          />
-          {!imageLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          )}
-          <div className="absolute top-3 right-3 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm">
-            {unit.points} Punkte
+      <div className="relative h-48 bg-gray-900 overflow-hidden">
+        <img
+          src={unit.previewImage || '/image.png'}
+          alt={unit.name}
+          className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
+          onLoad={() => setImageLoaded(true)}
+        />
+        {!imageLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
           </div>
-          {unit.stlFiles && unit.stlFiles.length > 0 && (
-            <div className="absolute top-3 left-3 bg-green-600 bg-opacity-90 text-white px-2 py-1 rounded text-sm">
-              STL verfügbar
-            </div>
-          )}
+        )}
+        <div className="absolute top-3 right-3 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm">
+          {unit.points} Punkte
         </div>
-      )}
+        {unit.stlFiles && unit.stlFiles.length > 0 && (
+          <div className="absolute top-3 left-3 bg-green-600 bg-opacity-90 text-white px-2 py-1 rounded text-sm">
+            STL verfügbar
+          </div>
+        )}
+      </div>
       
       <div className="p-6">
         {/* Unit Name and Basic Stats */}

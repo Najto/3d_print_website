@@ -58,18 +58,16 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
             {/* Left Column */}
             <div>
               {/* Preview Image */}
-              {unit.previewImage && (
-                <div className="mb-6">
-                  <img
-                    src={unit.previewImage.startsWith('http') ? unit.previewImage : fileService.getDownloadUrl(unit.previewImage)}
-                    alt={unit.name}
-                    className="w-full h-64 object-cover rounded-lg"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                </div>
-              )}
+              <div className="mb-6">
+                <img
+                  src={unit.previewImage
+                    ? (unit.previewImage.startsWith('http') ? unit.previewImage : fileService.getDownloadUrl(unit.previewImage))
+                    : '/image.png'
+                  }
+                  alt={unit.name}
+                  className="w-full h-64 object-cover rounded-lg"
+                />
+              </div>
 
               {/* Basic Stats */}
               {(unit.move || unit.health || unit.save || unit.control || unit.baseSize) && (
