@@ -1,7 +1,6 @@
 import React from 'react';
 import { X, Download, FileText, Zap, Shield, Swords, Info, Edit, Trash2 } from 'lucide-react';
 import { AoSUnit } from '../types/AoSCollection';
-import { fileService } from '../services/fileService';
 
 interface AoSUnitDetailsProps {
   unit: AoSUnit;
@@ -60,12 +59,12 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
               {/* Preview Image */}
               <div className="mb-6">
                 <img
-                  src={unit.previewImage
-                    ? (unit.previewImage.startsWith('http') ? unit.previewImage : fileService.getDownloadUrl(unit.previewImage))
-                    : '/image.png'
-                  }
+                  src={unit.previewImage || '/image.png'}
                   alt={unit.name}
                   className="w-full h-64 object-cover rounded-lg"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/image.png';
+                  }}
                 />
               </div>
 

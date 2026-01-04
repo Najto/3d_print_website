@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Upload, X, File, Image, FolderOpen, Info, CheckCircle, AlertCircle, Clock, Zap } from 'lucide-react';
-import { fileService } from '../services/fileService';
+import { supabase } from '../services/supabaseClient';
+import { compressImage, getFileExtension } from '../utils/imageCompression';
 
 interface FileUploadProps {
   onFileSelect?: (file: File) => void;
@@ -64,72 +65,93 @@ export function FileUpload({
   };
 
   const uploadFile = async (file: File) => {
-    if (!allegiance || !faction || !unit) {
+    if (!faction || !unit) {
       setUploadStatus('error');
-      setUploadMessage('Allegiance, Faction und Unit sind erforderlich');
+      setUploadMessage('Faction und Unit sind erforderlich');
       return;
     }
 
     setUploading(true);
     setUploadStatus('idle');
     setUploadMessage('');
-    
-    // Reset progress
+
+    const startTime = Date.now();
+
     setUploadProgress({
       loaded: 0,
       total: file.size,
       percentage: 0,
       speed: 0,
       eta: 0,
-      startTime: Date.now()
+      startTime
     });
 
     try {
-      const uploadData = type === 'image' 
-        ? { preview: file }
-        : { stlFiles: [file] };
+      let fileToUpload: Blob = file;
+      let finalExtension = file.name.split('.').pop() || 'jpg';
 
-      const result = await fileService.uploadFiles(
-        allegiance,
-        faction,
-        unit,
-        uploadData,
-        (progressEvent) => {
-          const now = Date.now();
-          const elapsed = (now - uploadProgress.startTime) / 1000; // seconds
-          const loaded = progressEvent.loaded;
-          const total = progressEvent.total || file.size;
-          const percentage = Math.round((loaded / total) * 100);
-          
-          // Calculate speed (bytes per second)
-          const speed = elapsed > 0 ? loaded / elapsed : 0;
-          
-          // Calculate ETA (seconds)
-          const remaining = total - loaded;
-          const eta = speed > 0 ? remaining / speed : 0;
-          
-          setUploadProgress({
-            loaded,
-            total,
-            percentage,
-            speed,
-            eta,
-            startTime: uploadProgress.startTime
-          });
-        }
-      );
+      if (type === 'image') {
+        setUploadMessage('Komprimiere Bild...');
+        setUploadProgress(prev => ({ ...prev, percentage: 10 }));
+
+        const compressedBlob = await compressImage(file, {
+          maxWidth: 1200,
+          maxHeight: 1200,
+          quality: 0.85,
+          outputFormat: 'image/webp'
+        });
+
+        fileToUpload = compressedBlob;
+        finalExtension = 'webp';
+
+        const originalSize = file.size;
+        const compressedSize = compressedBlob.size;
+        const savings = Math.round((1 - compressedSize / originalSize) * 100);
+
+        console.log(`Bildkomprimierung: ${formatFileSize(originalSize)} → ${formatFileSize(compressedSize)} (${savings}% gespart)`);
+
+        setUploadProgress(prev => ({
+          ...prev,
+          percentage: 25,
+          total: compressedSize,
+          loaded: compressedSize * 0.25
+        }));
+      }
+
+      setUploadMessage('Lade hoch...');
+
+      const filePath = `${faction}/${unit}/preview.${finalExtension}`;
+
+      const { data, error } = await supabase.storage
+        .from('aos-unit-images')
+        .upload(filePath, fileToUpload, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: type === 'image' ? 'image/webp' : file.type
+        });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setUploadProgress({
+        loaded: fileToUpload.size,
+        total: fileToUpload.size,
+        percentage: 100,
+        speed: fileToUpload.size / ((Date.now() - startTime) / 1000),
+        eta: 0,
+        startTime
+      });
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('aos-unit-images')
+        .getPublicUrl(filePath);
 
       setUploadStatus('success');
-      setUploadMessage('Datei erfolgreich hochgeladen');
-      
-      // Call completion callback with the file path
+      setUploadMessage('Bild erfolgreich hochgeladen');
+
       if (onUploadComplete) {
-        const filePath = type === 'image' 
-          ? result.files.preview 
-          : result.files.stlFiles[0]?.path;
-        if (filePath) {
-          onUploadComplete(filePath);
-        }
+        onUploadComplete(publicUrl);
       }
 
     } catch (error) {
@@ -139,19 +161,16 @@ export function FileUpload({
       console.error('Upload error details:', error);
     } finally {
       setUploading(false);
-      // Keep progress visible for a moment after completion
-      if (uploadProgress.percentage === 100) {
-        setTimeout(() => {
-          setUploadProgress({
-            loaded: 0,
-            total: 0,
-            percentage: 0,
-            speed: 0,
-            eta: 0,
-            startTime: 0
-          });
-        }, 2000);
-      }
+      setTimeout(() => {
+        setUploadProgress({
+          loaded: 0,
+          total: 0,
+          percentage: 0,
+          speed: 0,
+          eta: 0,
+          startTime: 0
+        });
+      }, 2000);
     }
   };
 
@@ -307,9 +326,9 @@ export function FileUpload({
         <div className="bg-gray-600 rounded-lg p-3 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             {type === 'image' && currentValue ? (
-              <img 
-                src={currentValue.startsWith('http') ? currentValue : `http://localhost:3001/${currentValue}`} 
-                alt="Preview" 
+              <img
+                src={currentValue}
+                alt="Preview"
                 className="w-12 h-12 object-cover rounded"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
@@ -326,7 +345,7 @@ export function FileUpload({
               </div>
               {autoUpload && (
                 <div className="text-green-400 text-xs">
-                  ✓ Auf Server gespeichert
+                  ✓ In Supabase Storage gespeichert
                 </div>
               )}
             </div>
