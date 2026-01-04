@@ -194,6 +194,21 @@ function parseUnitDetails(entry: any): Partial<UnitData> {
 
   parseNestedEntries(entry, details, 0);
 
+  // Remove duplicate weapons based on name
+  const uniqueWeapons = Array.from(
+    new Map(details.weapons!.map(w => [w.name, w])).values()
+  );
+  details.weapons = uniqueWeapons;
+
+  // Remove duplicate abilities based on name
+  const uniqueAbilities = Array.from(
+    new Map(details.abilities!.map(a => [a.name, a])).values()
+  );
+  details.abilities = uniqueAbilities;
+
+  // Remove duplicate keywords
+  details.keywords = Array.from(new Set(details.keywords));
+
   return details;
 }
 
