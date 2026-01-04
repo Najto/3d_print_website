@@ -1,220 +1,55 @@
-import React from 'react';
-import { Sword, Search, Home, ChevronRight, ArrowLeft, Plus, Sparkles, Settings as SettingsIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { Sword, Search, Home, ChevronRight, Settings as SettingsIcon } from 'lucide-react';
 import { AllegianceCard } from './components/AllegianceCard';
 import { AoSArmyCard } from './components/AoSArmyCard';
 import { AoSUnitCard } from './components/AoSUnitCard';
 import { AoSUnitDetails } from './components/AoSUnitDetails';
-import { AoSUnitEditor } from './components/AoSUnitEditor';
-import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { SearchBar } from './components/SearchBar';
-import { StorageDisplay } from './components/StorageDisplay';
 import Settings from './components/Settings';
 import { useAoSData } from './hooks/useAoSData';
 import { AoSUnit } from './types/AoSCollection';
-import { useState } from 'react';
-import { cleanupOldFiles } from './utils/fileUtils';
 
 function App() {
-  const { gameData: aosGameData, isLoading, updateUnit, deleteUnit, scanFoldersForNewUnits, scanAllFoldersForNewUnits, addScannedUnits, addAllScannedUnits, reloadData } = useAoSData();
-  const [selectedArmy, setSelectedArmy] = useState<string | null>(null);
+  const { gameData, isLoading, reloadData } = useAoSData();
+  const [selectedFactionId, setSelectedFactionId] = useState<string | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<AoSUnit | null>(null);
-  const [editingUnit, setEditingUnit] = useState<AoSUnit | null>(null);
-  const [isCreatingUnit, setIsCreatingUnit] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showOnlyDownloadable, setShowOnlyDownloadable] = useState(false);
-  const [unitToDelete, setUnitToDelete] = useState<AoSUnit | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const [isGlobalScanning, setIsGlobalScanning] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  
-  // Cleanup old files on app start
-  React.useEffect(() => {
-    cleanupOldFiles();
-  }, []);
-  
-  const currentArmy = selectedArmy ? aosGameData.armies.find(army => army.id === selectedArmy) : null;
-  const currentOtherCategory = selectedArmy ? aosGameData.otherCategories?.find(category => category.id === selectedArmy) : null;
-  const currentItem = currentArmy || currentOtherCategory;
-  
-  // Filter units based on download availability
-  const getFilteredUnits = (units: AoSUnit[]) => {
-    if (!showOnlyDownloadable) return units;
-    return units.filter(unit => unit.stlFiles && unit.stlFiles.length > 0);
-  };
 
-  // Search functionality
-  const searchResults = searchTerm ? [
-    ...aosGameData.armies,
-    ...(aosGameData.otherCategories || [])
-  ].flatMap(army => {
-    // Split search term into individual keywords and clean them
-    const searchKeywords = searchTerm.toLowerCase()
-      .split(/\s+/)
-      .filter(keyword => keyword.length > 0);
-    
-    if (searchKeywords.length === 0) return [];
-    
-    return army.units.filter(unit => {
-      // Check if ALL search keywords match somewhere in the unit data
-      return searchKeywords.every(searchKeyword => {
-        const unitName = unit.name.toLowerCase();
-        const armyName = army.name.toLowerCase();
-        const unitKeywords = unit.keywords.map(k => k.toLowerCase());
-        const abilities = unit.abilities.map(ability => 
-          typeof ability === 'string' ? ability.toLowerCase() : ability.name.toLowerCase()
-        );
-        
-        // Check if the search keyword matches in any of these fields
-        return unitName.includes(searchKeyword) ||
-               armyName.includes(searchKeyword) ||
-               unitKeywords.some(keyword => keyword.includes(searchKeyword)) ||
-               abilities.some(ability => ability.includes(searchKeyword)) ||
-               unit.weapons.some(weapon => weapon.name.toLowerCase().includes(searchKeyword));
-      });
-    });
-  }) : [];
-  
+  const selectedFaction = selectedFactionId
+    ? gameData.armies.find(army => army.id === selectedFactionId)
+    : null;
+
   const isSearchActive = searchTerm.length > 0;
 
-  const handleArmyClick = (armyId: string) => {
-    setSelectedArmy(armyId);
-    // Scroll to top when army is selected
+  const searchResults = isSearchActive
+    ? gameData.armies.flatMap(army =>
+        army.units
+          .filter(unit => {
+            const searchLower = searchTerm.toLowerCase();
+            return (
+              unit.name.toLowerCase().includes(searchLower) ||
+              army.name.toLowerCase().includes(searchLower) ||
+              unit.keywords.some(k => k.toLowerCase().includes(searchLower))
+            );
+          })
+          .map(unit => ({ ...unit, factionName: army.name }))
+      )
+    : [];
+
+  const handleFactionClick = (factionId: string) => {
+    setSelectedFactionId(factionId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleBackToHome = () => {
-    setSelectedArmy(null);
-    // Scroll to top when returning to home
+    setSelectedFactionId(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleUnitDetails = (unit: AoSUnit) => {
+  const handleUnitClick = (unit: AoSUnit) => {
     setSelectedUnit(unit);
   };
-
-  const handleEditUnit = (unit: AoSUnit) => {
-    setEditingUnit(unit);
-    setSelectedUnit(null);
-  };
-
-  const handleDeleteUnit = (unit: AoSUnit) => {
-    setUnitToDelete(unit);
-  };
-
-  const confirmDeleteUnit = () => {
-    if (unitToDelete && selectedArmy) {
-      deleteUnit(selectedArmy, unitToDelete.id);
-      setUnitToDelete(null);
-    }
-  };
-
-  const cancelDeleteUnit = () => {
-    setUnitToDelete(null);
-  };
-
-  const handleCreateUnit = () => {
-    setIsCreatingUnit(true);
-    setEditingUnit(null);
-  };
-
-  const handleSaveUnit = (unit: AoSUnit) => {
-    if (selectedArmy) {
-      updateUnit(selectedArmy, unit);
-      setEditingUnit(null);
-      setIsCreatingUnit(false);
-    }
-  };
-
-  const handleCloseEditor = () => {
-    setEditingUnit(null);
-    setIsCreatingUnit(false);
-  };
-
-  const handleScanFolders = async () => {
-    if (!selectedArmy) return;
-    
-    setIsScanning(true);
-    try {
-      const newUnits = await scanFoldersForNewUnits(selectedArmy);
-      if (newUnits.length > 0) {
-        addScannedUnits(selectedArmy, newUnits);
-        alert(`${newUnits.length} neue Einheit${newUnits.length !== 1 ? 'en' : ''} aus Ordnern erstellt:\n${newUnits.map(u => `• ${u.name}`).join('\n')}`);
-      } else {
-        alert('Keine neuen Einheiten in Ordnern gefunden.');
-      }
-    } catch (error) {
-      console.error('Scan error:', error);
-      alert('Fehler beim Scannen der Ordner.');
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
-const handleGlobalScanFolders = async () => {
-  setIsGlobalScanning(true);
-  try {
-    const result = await scanAllFoldersForNewUnits();
-
-    if (result.totalNewUnits > 0) {
-      const readableArmyNames = {
-        // Order
-        'stormcast-eternals': 'Stormcast Eternals',
-        'cities-of-sigmar': 'Cities of Sigmar',
-        'sylvaneth': 'Sylvaneth',
-        'lumineth-realm-lords': 'Lumineth Realm-lords',
-        'idoneth-deepkin': 'Idoneth Deepkin',
-        'daughters-of-khaine': 'Daughters of Khaine',
-        'fyreslayers': 'Fyreslayers',
-        'kharadron-overlords': 'Kharadron Overlords',
-        'seraphon': 'Seraphon',
-
-        // Chaos
-        'slaves-to-darkness': 'Slaves to Darkness',
-        'khorne-bloodbound': 'Blades of Khorne',
-        'disciples-of-tzeentch': 'Disciples of Tzeentch',
-        'maggotkin-of-nurgle': 'Maggotkin of Nurgle',
-        'hedonites-of-slaanesh': 'Hedonites of Slaanesh',
-        'skaven': 'Skaven',
-        'beasts-of-chaos': 'Beasts of Chaos',
-
-        // Death
-        'nighthaunt': 'Nighthaunt',
-        'ossiarch-bonereapers': 'Ossiarch Bonereapers',
-        'flesh-eater-courts': 'Flesh-eater Courts',
-        'soulblight-gravelords': 'Soulblight Gravelords',
-
-        // Destruction
-        'orruk-warclans': 'Orruk Warclans',
-        'gloomspite-gitz': 'Gloomspite Gitz',
-        'sons-of-behemat': 'Sons of Behemat',
-        'ogor-mawtribes': 'Ogor Mawtribes',
-
-        // Other
-        'endless-spells': 'Endloszauber',
-        'buildings': 'Gelände / Gebäude'
-      };
-
-      const summaryLines = [
-        `🎉 ${result.totalNewUnits} neue Einheit${result.totalNewUnits !== 1 ? 'en' : ''} gefunden!`,
-        '',
-        ...result.summary.map(army => {
-          const name = readableArmyNames[army.armyName] || army.armyName;
-          return `📦 ${name}: ${army.newUnitsCount} Einheit${army.newUnitsCount !== 1 ? 'en' : ''}\n${army.unitNames.map(n => `   • ${n}`).join('\n')}`;
-        })
-      ];
-
-      alert(summaryLines.join('\n'));
-    } else {
-      alert(`🔍 ${result.scannedArmies} Armeen gescannt – keine neuen Einheiten gefunden.`);
-    }
-  } catch (error) {
-    console.error('Global scan error:', error);
-    alert('Fehler beim globalen Ordner-Scan.');
-  } finally {
-    setIsGlobalScanning(false);
-  }
-};
-
 
   if (showSettings) {
     return (
@@ -230,7 +65,7 @@ const handleGlobalScanFolders = async () => {
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-yellow-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white text-lg">Lade Daten...</p>
+          <p className="text-white text-lg">Lade Daten aus der Datenbank...</p>
         </div>
       </div>
     );
@@ -238,7 +73,6 @@ const handleGlobalScanFolders = async () => {
 
   return (
     <div className="min-h-screen bg-gray-900">
-      {/* Header */}
       <header className="bg-gray-800 border-b border-gray-700 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -252,35 +86,18 @@ const handleGlobalScanFolders = async () => {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={handleGlobalScanFolders}
-                disabled={isGlobalScanning}
-                className="bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
-              >
-                {isGlobalScanning ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <Search className="w-4 h-4" />
-                )}
-                <span>{isGlobalScanning ? 'Scanne alle...' : 'Alle Ordner scannen'}</span>
-              </button>
-
-              <button
-                onClick={() => setShowSettings(true)}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
-              >
-                <SettingsIcon className="w-4 h-4" />
-                <span>Einstellungen</span>
-              </button>
-            </div>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+            >
+              <SettingsIcon className="w-4 h-4" />
+              <span>Einstellungen</span>
+            </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search Bar */}
         <div className="mb-8">
           <SearchBar
             value={searchTerm}
@@ -289,35 +106,30 @@ const handleGlobalScanFolders = async () => {
           />
         </div>
 
-        {/* Breadcrumb Navigation */}
-        {!isSearchActive && currentItem && (
+        {!isSearchActive && selectedFaction && (
           <nav className="sticky top-16 z-20 bg-gray-900 py-4 mb-6 border-b border-gray-700">
             <div className="flex items-center space-x-2 text-sm text-gray-400">
-            <button
-              onClick={handleBackToHome}
-              className="flex items-center hover:text-yellow-400 transition-colors"
-            >
-              <Home className="w-4 h-4" />
-            </button>
-            <ChevronRight className="w-4 h-4 text-gray-600" />
-            <button
-              onClick={handleBackToHome}
-              className="hover:text-yellow-400 transition-colors"
-            >
-              {currentArmy 
-                ? Object.values(aosGameData.allegianceGroups).find(allegiance => 
-                    allegiance.armies.includes(currentArmy.id)
-                  )?.name
-                : 'Others'
-              }
-            </button>
-            <ChevronRight className="w-4 h-4 text-gray-600" />
-            <span className="text-white font-medium">{currentItem.name}</span>
+              <button
+                onClick={handleBackToHome}
+                className="flex items-center hover:text-yellow-400 transition-colors"
+              >
+                <Home className="w-4 h-4" />
+              </button>
+              <ChevronRight className="w-4 h-4 text-gray-600" />
+              <button
+                onClick={handleBackToHome}
+                className="hover:text-yellow-400 transition-colors"
+              >
+                {Object.values(gameData.allegianceGroups).find(allegiance =>
+                  allegiance.armies.includes(selectedFaction.id)
+                )?.name || 'Factions'}
+              </button>
+              <ChevronRight className="w-4 h-4 text-gray-600" />
+              <span className="text-white font-medium">{selectedFaction.name}</span>
             </div>
           </nav>
         )}
 
-        {/* Search Results Header */}
         {isSearchActive && (
           <div className="mb-6">
             <div className="flex items-center space-x-2 text-gray-400">
@@ -329,219 +141,131 @@ const handleGlobalScanFolders = async () => {
           </div>
         )}
 
-        {/* Content */}
-        {/* Allegiance Overview with Listed Armies */}
-        {!isSearchActive && !currentItem && (
-          <div className="space-y-12">
-            {/* Main Allegiances */}
-            {Object.entries(aosGameData.allegianceGroups).map(([key, allegiance]) => {
-              const allegianceArmies = aosGameData.armies.filter(army => allegiance.armies.includes(army.id));
-              return (
-                <div key={key} className="space-y-6">
-                  {/* Allegiance Header */}
-                  <AllegianceCard
-                    allegiance={allegiance}
-                    armyCount={allegiance.armies.length}
-                  />
-                  
-                  {/* Armies Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {allegianceArmies.map((army) => (
-                      <AoSArmyCard
-                        key={army.id}
-                        army={army}
-                        onClick={() => handleArmyClick(army.id)}
+        {!isSearchActive && !selectedFaction && (
+          <>
+            {Object.keys(gameData.allegianceGroups).length === 0 ? (
+              <div className="text-center py-16">
+                <div className="bg-gray-800 rounded-lg p-8 max-w-2xl mx-auto border border-gray-700">
+                  <Sword className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                  <h2 className="text-2xl font-bold text-white mb-2">Keine Daten gefunden</h2>
+                  <p className="text-gray-400 mb-6">
+                    Es sind noch keine Fraktionen in der Datenbank vorhanden.
+                  </p>
+                  <button
+                    onClick={() => setShowSettings(true)}
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg transition-colors flex items-center space-x-2 mx-auto"
+                  >
+                    <SettingsIcon className="w-5 h-5" />
+                    <span>Daten importieren</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-12">
+                {Object.entries(gameData.allegianceGroups).map(([key, allegiance]) => {
+                  const allegianceFactions = gameData.armies.filter(army =>
+                    allegiance.armies.includes(army.id)
+                  );
+
+                  if (allegianceFactions.length === 0) return null;
+
+                  return (
+                    <div key={key} className="space-y-6">
+                      <AllegianceCard
+                        allegiance={allegiance}
+                        armyCount={allegianceFactions.length}
                       />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-            
-            {/* Others Category */}
-            <div className="space-y-6">
-              {/* Others Header */}
-              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                <div className="flex items-center space-x-4 mb-4">
-                  <div className="p-4 bg-gray-600 rounded-lg">
-                    <Sparkles className="w-8 h-8 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h2 className="text-3xl font-bold text-white mb-2">
-                      Others
-                    </h2>
-                    <p className="text-gray-400 text-sm mb-3">
-                      {aosGameData.otherCategories.length} {aosGameData.otherCategories.length === 1 ? 'Kategorie' : 'Kategorien'}
-                    </p>
-                    <p className="text-gray-300 text-sm leading-relaxed">
-                      Universelle Elemente wie Endless Spells und Gebäude
-                    </p>
-                  </div>
-                  <div className="inline-flex items-center px-4 py-2 rounded-full text-sm text-white bg-gray-600">
-                    Universal
-                  </div>
-                </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {allegianceFactions.map((army) => (
+                          <AoSArmyCard
+                            key={army.id}
+                            army={army}
+                            onClick={() => handleFactionClick(army.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              
-              {/* Others Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {aosGameData.otherCategories.map((category) => (
-                  <AoSArmyCard
-                    key={category.id}
-                    army={category}
-                    onClick={() => handleArmyClick(category.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
 
-        {/* Units Grid */}
-        {!isSearchActive && currentItem && (
+        {!isSearchActive && selectedFaction && (
           <div>
-            {/* Filter Buttons */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-4">
-                <button
-                  onClick={handleCreateUnit}
-                  className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Neue Einheit</span>
-                </button>
-                <button
-                  onClick={handleScanFolders}
-                  disabled={isScanning}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
-                >
-                  {isScanning ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                  <span>{isScanning ? 'Scanne...' : 'Ordner scannen'}</span>
-                </button>
-                <button
-                  onClick={() => setShowOnlyDownloadable(false)}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    !showOnlyDownloadable
-                      ? 'bg-yellow-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  Alle anzeigen ({currentItem.units.length})
-                </button>
-                <button
-                  onClick={() => setShowOnlyDownloadable(true)}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    showOnlyDownloadable
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  Nur herunterladbar ({currentItem.units.filter(unit => unit.stlFiles && unit.stlFiles.length > 0).length})
-                </button>
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">{selectedFaction.name}</h2>
+              <p className="text-gray-400">
+                {selectedFaction.units.length} {selectedFaction.units.length === 1 ? 'Einheit' : 'Einheiten'}
+              </p>
+            </div>
+
+            {selectedFaction.units.length === 0 ? (
+              <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
+                <p className="text-gray-400 text-lg">Keine Einheiten für diese Fraktion verfügbar.</p>
               </div>
-            </div>
-
-            {/* Units Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {getFilteredUnits(currentItem.units).map((unit) => (
-                <AoSUnitCard 
-                  key={unit.id} 
-                  unit={unit} 
-                  onViewDetails={handleUnitDetails}
-                  onEdit={handleEditUnit}
-                  onDelete={handleDeleteUnit}
-                />
-              ))}
-            </div>
-
-            {/* No Results Message */}
-            {showOnlyDownloadable && getFilteredUnits(currentItem.units).length === 0 && (
-              <div className="text-center py-12">
-                <div className="text-gray-400 text-lg mb-2">
-                  Keine herunterladbaren Einheiten verfügbar
-                </div>
-                <div className="text-gray-500 text-sm">
-                  Für diese Kategorie sind noch keine STL-Dateien hinterlegt.
-                </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {selectedFaction.units.map((unit) => (
+                  <AoSUnitCard
+                    key={unit.id}
+                    unit={unit}
+                    onViewDetails={handleUnitClick}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                  />
+                ))}
               </div>
             )}
           </div>
         )}
 
-        {/* Search Results Grid */}
         {isSearchActive && searchResults.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {searchResults.map((unit) => (
-              <AoSUnitCard 
-                key={unit.id} 
-                unit={unit} 
-                onViewDetails={handleUnitDetails}
-                onEdit={handleEditUnit}
-                onDelete={handleDeleteUnit}
+            {searchResults.map((unit: any) => (
+              <AoSUnitCard
+                key={unit.id}
+                unit={unit}
+                onViewDetails={handleUnitClick}
+                onEdit={() => {}}
+                onDelete={() => {}}
               />
             ))}
           </div>
         )}
 
-        {/* No Search Results */}
         {isSearchActive && searchResults.length === 0 && (
           <div className="text-center py-12">
             <Search className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <h2 className="text-2xl font-semibold text-gray-400 mb-2">Keine Einheiten gefunden</h2>
             <p className="text-gray-500">
-              Versuche andere Suchbegriffe oder durchsuche die Armeen.
+              Versuche andere Suchbegriffe oder durchsuche die Fraktionen.
             </p>
           </div>
         )}
       </main>
 
-      {/* Unit Details Modal */}
       {selectedUnit && (
         <AoSUnitDetails
           unit={selectedUnit}
           onClose={() => setSelectedUnit(null)}
-          onEdit={handleEditUnit}
-          onDelete={handleDeleteUnit}
+          onEdit={() => {}}
+          onDelete={() => {}}
         />
       )}
 
-      {/* Unit Editor Modal */}
-      {(editingUnit || isCreatingUnit) && selectedArmy && (
-        <AoSUnitEditor
-          unit={editingUnit}
-          armyId={selectedArmy}
-          onSave={handleSaveUnit}
-          onClose={handleCloseEditor}
-        />
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {unitToDelete && (
-        <DeleteConfirmationModal
-          unit={unitToDelete}
-          onConfirm={confirmDeleteUnit}
-          onCancel={cancelDeleteUnit}
-        />
-      )}
-
-      {/* Footer */}
       <footer className="bg-gray-800 border-t border-gray-700 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Storage Display */}
-          <div className="mb-6">
-            <StorageDisplay />
-          </div>
-          
           <div className="flex items-center justify-between">
             <p className="text-gray-400 text-sm">
               © 2025 Warhammer Age of Sigmar Collection. 4. Edition Regeln und 3D-Druckdateien.
             </p>
             <div className="flex items-center space-x-4 text-sm text-gray-400">
-              <span>{aosGameData.armies.length} Armeen • {aosGameData.armies.reduce((acc, army) => acc + army.units.length, 0)} Einheiten</span>
+              <span>
+                {Object.keys(gameData.allegianceGroups).length} Grand Alliances • {gameData.armies.length} Fraktionen • {gameData.armies.reduce((acc, army) => acc + army.units.length, 0)} Einheiten
+              </span>
             </div>
           </div>
         </div>
