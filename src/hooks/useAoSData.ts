@@ -19,14 +19,24 @@ export function useAoSData() {
 
       const databaseData = await aosDatabaseService.loadArmiesFromDatabase();
 
-      const response = await fetch(`${API_BASE_URL}/data`);
-      if (response.ok) {
-        const serverData = await response.json();
-        const mergedData = mergeWithDatabaseData(databaseData, serverData);
-        setGameData(mergedData);
-        return;
+      // Try to fetch from server (optional)
+      try {
+        const response = await fetch(`${API_BASE_URL}/data`);
+        if (response.ok) {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const serverData = await response.json();
+            const mergedData = mergeWithDatabaseData(databaseData, serverData);
+            setGameData(mergedData);
+            return;
+          }
+        }
+      } catch (serverError) {
+        // Server not available, continue with localStorage
+        console.log('Server not available, using localStorage');
       }
 
+      // Fallback to localStorage
       const savedData = localStorage.getItem(STORAGE_KEY);
       if (savedData) {
         try {
