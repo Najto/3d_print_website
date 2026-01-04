@@ -29,7 +29,8 @@ export function AoSUnitEditor({ unit, armyId, onSave, onClose }: AoSUnitEditorPr
     notes: '',
     stlFiles: [],
     previewImage: '',
-    printNotes: ''
+    printNotes: '',
+    isCustom: !unit
   });
 
   // Get folder path for this unit
@@ -62,7 +63,8 @@ export function AoSUnitEditor({ unit, armyId, onSave, onClose }: AoSUnitEditorPr
         notes: '',
         stlFiles: [],
         previewImage: '',
-        printNotes: ''
+        printNotes: '',
+        isCustom: true
       });
     }
   }, [unit]);

@@ -44,7 +44,8 @@ export function useAoSData() {
               stlFiles: unitCustomData.stlFiles || dbUnit.stlFiles,
               previewImage: unitCustomData.previewImage || dbUnit.previewImage,
               printNotes: unitCustomData.printNotes || dbUnit.printNotes,
-              notes: unitCustomData.notes || dbUnit.notes
+              notes: unitCustomData.notes || dbUnit.notes,
+              isCustom: unitCustomData.isCustom || dbUnit.isCustom
             };
           }
           return dbUnit;
@@ -66,7 +67,8 @@ export function useAoSData() {
               stlFiles: unitCustomData.stlFiles || dbUnit.stlFiles,
               previewImage: unitCustomData.previewImage || dbUnit.previewImage,
               printNotes: unitCustomData.printNotes || dbUnit.printNotes,
-              notes: unitCustomData.notes || dbUnit.notes
+              notes: unitCustomData.notes || dbUnit.notes,
+              isCustom: unitCustomData.isCustom || dbUnit.isCustom
             };
           }
           return dbUnit;
@@ -86,7 +88,8 @@ export function useAoSData() {
         stlFiles: unit.stlFiles,
         previewImage: unit.previewImage,
         printNotes: unit.printNotes,
-        notes: unit.notes
+        notes: unit.notes,
+        isCustom: unit.isCustom
       };
 
       await aosDatabaseService.saveCustomUnitData(factionId, unit.id, customData);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sword, Search, Home, ChevronRight, Settings as SettingsIcon } from 'lucide-react';
+import { Sword, Search, Home, ChevronRight, Settings as SettingsIcon, Plus } from 'lucide-react';
 import { AllegianceCard } from './components/AllegianceCard';
 import { AoSArmyCard } from './components/AoSArmyCard';
 import { AoSUnitCard } from './components/AoSUnitCard';
@@ -69,6 +69,11 @@ function App() {
   const handleCloseEditor = () => {
     setEditingUnit(null);
     setEditingArmyId('');
+  };
+
+  const handleCreateCustomUnit = (armyId: string) => {
+    setEditingUnit(null);
+    setEditingArmyId(armyId);
   };
 
   if (showSettings) {
@@ -215,11 +220,20 @@ function App() {
 
         {!isSearchActive && selectedFaction && (
           <div>
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-white mb-2">{selectedFaction.name}</h2>
-              <p className="text-gray-400">
-                {selectedFaction.units.length} {selectedFaction.units.length === 1 ? 'Einheit' : 'Einheiten'}
-              </p>
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-2">{selectedFaction.name}</h2>
+                <p className="text-gray-400">
+                  {selectedFaction.units.length} {selectedFaction.units.length === 1 ? 'Einheit' : 'Einheiten'}
+                </p>
+              </div>
+              <button
+                onClick={() => handleCreateCustomUnit(selectedFaction.id)}
+                className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Custom Unit erstellen</span>
+              </button>
             </div>
 
             {selectedFaction.units.length === 0 ? (
@@ -228,15 +242,21 @@ function App() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {selectedFaction.units.map((unit) => (
-                  <AoSUnitCard
-                    key={unit.id}
-                    unit={unit}
-                    onViewDetails={handleUnitClick}
-                    onEdit={() => {}}
-                    onDelete={() => {}}
-                  />
-                ))}
+                {[...selectedFaction.units]
+                  .sort((a, b) => {
+                    if (a.isCustom && !b.isCustom) return 1;
+                    if (!a.isCustom && b.isCustom) return -1;
+                    return 0;
+                  })
+                  .map((unit) => (
+                    <AoSUnitCard
+                      key={unit.id}
+                      unit={unit}
+                      onViewDetails={handleUnitClick}
+                      onEdit={() => {}}
+                      onDelete={() => {}}
+                    />
+                  ))}
               </div>
             )}
           </div>

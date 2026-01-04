@@ -56,10 +56,15 @@ export function AoSUnitCard({ unit, onViewDetails, onEdit, onDelete }: AoSUnitCa
       <div className="p-6">
         {/* Unit Name and Basic Stats */}
         <div className="mb-4">
-          <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-yellow-400 transition-colors">
+          <h3 className="text-xl font-semibold text-white mb-1 group-hover:text-yellow-400 transition-colors">
             {unit.name}
           </h3>
-          
+          {unit.isCustom && (
+            <div className="text-orange-500 text-sm font-semibold mb-2">
+              -CUSTOM-
+            </div>
+          )}
+
           <div className="grid grid-cols-4 gap-2 text-sm">
             <div className="bg-gray-700 rounded p-2 text-center">
               <div className="text-gray-400">Move</div>
@@ -90,41 +95,45 @@ export function AoSUnitCard({ unit, onViewDetails, onEdit, onDelete }: AoSUnitCa
         </div>
 
         {/* Keywords */}
-        <div className="flex flex-wrap gap-1 mb-4">
-          {unit.keywords.slice(0, 4).map((keyword, index) => (
-            <span
-              key={index}
-              className={`${getKeywordColor(keyword)} text-white px-2 py-1 rounded-full text-xs`}
-            >
-              {keyword}
-            </span>
-          ))}
-          {unit.keywords.length > 4 && (
-            <span className="bg-gray-600 text-gray-300 px-2 py-1 rounded-full text-xs">
-              +{unit.keywords.length - 4}
-            </span>
-          )}
-        </div>
-
-        {/* Weapons Preview */}
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-gray-300 mb-2">Waffen:</h4>
-          <div className="space-y-1">
-            {unit.weapons.slice(0, 2).map((weapon, index) => (
-              <div key={index} className="text-sm text-gray-400">
-                <span className="text-white">{weapon.name}</span>
-                <span className="ml-2">
-                  {weapon.range} • {weapon.attacks}A • {weapon.damage}D
-                </span>
-              </div>
+        {unit.keywords && unit.keywords.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-4">
+            {unit.keywords.slice(0, 4).map((keyword, index) => (
+              <span
+                key={index}
+                className={`${getKeywordColor(keyword)} text-white px-2 py-1 rounded-full text-xs`}
+              >
+                {keyword}
+              </span>
             ))}
-            {unit.weapons.length > 2 && (
-              <div className="text-sm text-gray-400">
-                +{unit.weapons.length - 2} weitere Waffen
-              </div>
+            {unit.keywords.length > 4 && (
+              <span className="bg-gray-600 text-gray-300 px-2 py-1 rounded-full text-xs">
+                +{unit.keywords.length - 4}
+              </span>
             )}
           </div>
-        </div>
+        )}
+
+        {/* Weapons Preview */}
+        {unit.weapons && unit.weapons.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-sm font-semibold text-gray-300 mb-2">Waffen:</h4>
+            <div className="space-y-1">
+              {unit.weapons.slice(0, 2).map((weapon, index) => (
+                <div key={index} className="text-sm text-gray-400">
+                  <span className="text-white">{weapon.name}</span>
+                  <span className="ml-2">
+                    {weapon.range} • {weapon.attacks}A • {weapon.damage}D
+                  </span>
+                </div>
+              ))}
+              {unit.weapons.length > 2 && (
+                <div className="text-sm text-gray-400">
+                  +{unit.weapons.length - 2} weitere Waffen
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* STL Files Info */}
         {unit.stlFiles && unit.stlFiles.length > 0 && (

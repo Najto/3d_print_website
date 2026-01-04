@@ -257,6 +257,7 @@ export const aosDatabaseService = {
             preview_image: customData.previewImage || null,
             print_notes: customData.printNotes || null,
             notes: customData.notes || null,
+            is_custom: customData.isCustom || false,
             updated_at: new Date().toISOString()
           })
           .eq('id', existing.id);
@@ -270,7 +271,8 @@ export const aosDatabaseService = {
             stl_files: customData.stlFiles || [],
             preview_image: customData.previewImage || null,
             print_notes: customData.printNotes || null,
-            notes: customData.notes || null
+            notes: customData.notes || null,
+            is_custom: customData.isCustom || false
           });
       }
 
@@ -311,7 +313,8 @@ export const aosDatabaseService = {
             stlFiles: row.stl_files || [],
             previewImage: row.preview_image || '',
             printNotes: row.print_notes || '',
-            notes: row.notes || ''
+            notes: row.notes || '',
+            isCustom: row.is_custom || false
           });
         });
 

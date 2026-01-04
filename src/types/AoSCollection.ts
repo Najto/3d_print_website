@@ -41,6 +41,7 @@ export interface AoSUnit {
   unitSize?: string;
   reinforcement?: string;
   notes?: string;
+  isCustom?: boolean;
   // 3D Print Files
   stlFiles?: {
     name: string;
