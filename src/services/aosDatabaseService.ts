@@ -40,8 +40,22 @@ export const aosDatabaseService = {
 
       const factionIdToArmyId = new Map<number, string>();
 
+      const factionNameMapping: Record<string, string> = {
+        'blades-of-khorne': 'blades-of-khorne',
+        'ironjawz': 'orruk-warclans',
+        'kruleboyz': 'orruk-warclans',
+        'bonesplitterz-[legends]': 'orruk-warclans',
+        'beasts-of-chaos-[legends]': 'beasts-of-chaos'
+      };
+
       factions.forEach(faction => {
         const normalizedName = faction.name.toLowerCase().replace(/\s+/g, '-');
+
+        const mappedArmyId = factionNameMapping[normalizedName];
+        if (mappedArmyId && armiesMap.has(mappedArmyId)) {
+          factionIdToArmyId.set(faction.id, mappedArmyId);
+          return;
+        }
 
         for (const [armyId, army] of armiesMap.entries()) {
           const armyNormalizedName = army.name.toLowerCase().replace(/\s+/g, '-');
@@ -62,13 +76,19 @@ export const aosDatabaseService = {
           const army = armiesMap.get(armyId);
           if (!army) return;
 
+          const unitType = unit.unit_type || '';
+          const keywords = unitType ? [unitType] : [];
+
           const aosUnit: AoSUnit = {
             id: unit.battlescribe_id,
             name: unit.name,
             points: unit.points,
-            keywords: [],
+            keywords,
             weapons: [],
-            abilities: [],
+            abilities: [{
+              name: 'Offizielle Daten',
+              description: `Diese Unit wurde aus den offiziellen BSData importiert. Punkte: ${unit.points}${unit.min_size ? `, Größe: ${unit.min_size}${unit.max_size && unit.max_size !== unit.min_size ? `-${unit.max_size}` : ''}` : ''}`
+            }],
             stats: {
               move: 0,
               health: 0,
