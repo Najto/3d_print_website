@@ -21,6 +21,14 @@ interface DbUnit {
   unit_type: string | null;
   min_size: number | null;
   max_size: number | null;
+  move: string | null;
+  health: number | null;
+  save: string | null;
+  control: number | null;
+  base_size: string | null;
+  weapons: any[];
+  abilities: any[];
+  keywords: string[];
   raw_data: any;
 }
 
@@ -135,7 +143,9 @@ export const aosDatabaseService = {
     // Convert database units to AoS units
     const aosUnits: AoSUnit[] = units.map(unit => {
       const unitType = unit.unit_type || '';
-      const keywords = unitType ? [unitType] : [];
+      const keywords = unit.keywords && unit.keywords.length > 0
+        ? unit.keywords
+        : (unitType ? [unitType] : []);
 
       const unitSize = unit.min_size
         ? (unit.max_size && unit.max_size !== unit.min_size
@@ -147,17 +157,15 @@ export const aosDatabaseService = {
         id: unit.battlescribe_id,
         name: unit.name,
         points: unit.points,
-        move: '6"',
-        health: 1,
-        save: '4+',
-        control: 1,
+        move: unit.move || undefined,
+        health: unit.health || undefined,
+        save: unit.save || undefined,
+        control: unit.control || undefined,
+        baseSize: unit.base_size || undefined,
         unitSize,
         keywords,
-        weapons: [],
-        abilities: [{
-          name: 'Offizielle Daten',
-          description: `Diese Unit wurde aus den offiziellen BSData importiert. Punkte: ${unit.points}${unit.min_size ? `, Größe: ${unitSize}` : ''}`
-        }],
+        weapons: unit.weapons || [],
+        abilities: unit.abilities || [],
         stlFiles: []
       };
     });

@@ -7,38 +7,49 @@ export interface AoSRule {
 
 export interface AoSWeapon {
   name: string;
-  range: string;
+  type: 'melee' | 'ranged';
+  range?: string;
   attacks: string;
   hit: string;
   wound: string;
   rend: string;
   damage: string;
-  abilities?: string[];
+  ability?: string;
+}
+
+export interface AoSAbility {
+  name: string;
+  type: 'passive' | 'active' | 'reaction' | 'other';
+  effect: string;
+  keywords?: string;
+  color?: string;
+  defenseType?: string;
 }
 
 export interface AoSUnit {
   id: string;
   name: string;
-  points: number;
-  move: string;
-  health: number;
-  save: string;
-  control: number;
-  weapons: AoSWeapon[];
-  abilities: (string | { name: string; description: string })[];
-  keywords: string[];
-  unitSize: string;
+  points?: number;
+  move?: string;
+  health?: number;
+  save?: string;
+  control?: number;
+  baseSize?: string;
+  weapons?: AoSWeapon[];
+  abilities?: AoSAbility[];
+  keywords?: string[];
+  unitSize?: string;
   reinforcement?: string;
   notes?: string;
   // 3D Print Files
   stlFiles?: {
     name: string;
     size: string;
-    variant?: string; // z.B. "weapon_variant", "pose_1"
-    path?: string; // Path to file in public folder structure
+    variant?: string;
+    path?: string;
   }[];
-  previewImage?: string; // Pfad zu preview.jpg
-  printNotes?: string; // Druckhinweise, Skalierung etc.
+  previewImage?: string;
+  printNotes?: string;
 }
 
 export interface AoSFormation {

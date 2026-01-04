@@ -19,10 +19,177 @@ interface UnitData {
   name: string;
   points: number;
   unitType?: string;
+  move?: string;
+  health?: number;
+  save?: string;
+  control?: number;
+  baseSize?: string;
+  weapons?: any[];
+  abilities?: any[];
+  keywords?: string[];
   rawData: any;
 }
 
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/BSData/age-of-sigmar-4th/main";
+
+function parseUnitDetails(entry: any): Partial<UnitData> {
+  const details: Partial<UnitData> = {
+    weapons: [],
+    abilities: [],
+    keywords: [],
+  };
+
+  // Parse profiles (unit stats, weapons, abilities)
+  const profiles = entry.profiles?.profile || [];
+  const profileArray = Array.isArray(profiles) ? profiles : [profiles];
+
+  for (const profile of profileArray) {
+    if (!profile || typeof profile !== 'object') continue;
+
+    const profileType = profile["@_typeName"];
+    const profileName = profile["@_name"];
+
+    // Parse Unit profile (Move, Health, Save, Control)
+    if (profileType === "Unit") {
+      const chars = profile.characteristics?.characteristic || [];
+      const charArray = Array.isArray(chars) ? chars : [chars];
+
+      for (const char of charArray) {
+        const name = char["@_name"];
+        const value = char["#text"] || char["@_value"];
+
+        if (name === "Move") details.move = value;
+        if (name === "Health") details.health = parseInt(value) || undefined;
+        if (name === "Save") details.save = value;
+        if (name === "Control") details.control = parseInt(value) || undefined;
+      }
+    }
+
+    // Parse Melee Weapon
+    if (profileType === "Melee Weapon") {
+      const weapon: any = {
+        name: profileName,
+        type: "melee",
+      };
+
+      const chars = profile.characteristics?.characteristic || [];
+      const charArray = Array.isArray(chars) ? chars : [chars];
+
+      for (const char of charArray) {
+        const name = char["@_name"];
+        const value = char["#text"] || char["@_value"];
+
+        if (name === "Atk") weapon.attacks = value;
+        if (name === "Hit") weapon.hit = value;
+        if (name === "Wnd") weapon.wound = value;
+        if (name === "Rnd") weapon.rend = value;
+        if (name === "Dmg") weapon.damage = value;
+        if (name === "Ability") weapon.ability = value;
+      }
+
+      details.weapons!.push(weapon);
+    }
+
+    // Parse Ranged Weapon
+    if (profileType === "Ranged Weapon") {
+      const weapon: any = {
+        name: profileName,
+        type: "ranged",
+      };
+
+      const chars = profile.characteristics?.characteristic || [];
+      const charArray = Array.isArray(chars) ? chars : [chars];
+
+      for (const char of charArray) {
+        const name = char["@_name"];
+        const value = char["#text"] || char["@_value"];
+
+        if (name === "Rng") weapon.range = value;
+        if (name === "Atk") weapon.attacks = value;
+        if (name === "Hit") weapon.hit = value;
+        if (name === "Wnd") weapon.wound = value;
+        if (name === "Rnd") weapon.rend = value;
+        if (name === "Dmg") weapon.damage = value;
+        if (name === "Ability") weapon.ability = value;
+      }
+
+      details.weapons!.push(weapon);
+    }
+
+    // Parse Ability
+    if (profileType?.includes("Ability")) {
+      const ability: any = {
+        name: profileName,
+        type: profileType.includes("Passive") ? "passive" : "active",
+      };
+
+      const chars = profile.characteristics?.characteristic || [];
+      const charArray = Array.isArray(chars) ? chars : [chars];
+
+      for (const char of charArray) {
+        const name = char["@_name"];
+        const value = char["#text"] || char["@_value"];
+
+        if (name === "Effect") ability.effect = value;
+        if (name === "Keywords") ability.keywords = value;
+      }
+
+      // Parse attributes (color, type)
+      const attributes = profile.attributes?.attribute || [];
+      const attrArray = Array.isArray(attributes) ? attributes : [attributes];
+
+      for (const attr of attrArray) {
+        const name = attr["@_name"];
+        const value = attr["#text"] || attr["@_value"];
+
+        if (name === "Color") ability.color = value;
+        if (name === "Type") ability.defenseType = value;
+      }
+
+      details.abilities!.push(ability);
+    }
+  }
+
+  // Parse keywords from categoryLinks
+  const categoryLinks = entry.categoryLinks?.categoryLink || [];
+  const categoryArray = Array.isArray(categoryLinks) ? categoryLinks : [categoryLinks];
+
+  for (const link of categoryArray) {
+    if (!link || typeof link !== 'object') continue;
+    const name = link["@_name"];
+    if (name && !name.includes("(") && name !== "CHAOS" && name !== "ORDER" && name !== "DEATH" && name !== "DESTRUCTION") {
+      details.keywords!.push(name);
+    }
+  }
+
+  // Parse base size from rules
+  const rules = entry.rules?.rule || [];
+  const ruleArray = Array.isArray(rules) ? rules : [rules];
+
+  for (const rule of ruleArray) {
+    if (rule["@_name"] === "Base Size") {
+      details.baseSize = rule.description;
+    }
+  }
+
+  // Also check nested selectionEntries for base size
+  const selectionEntries = entry.selectionEntries?.selectionEntry || [];
+  const selectionArray = Array.isArray(selectionEntries) ? selectionEntries : [selectionEntries];
+
+  for (const subEntry of selectionArray) {
+    if (!subEntry) continue;
+    const subRules = subEntry.rules?.rule || [];
+    const subRuleArray = Array.isArray(subRules) ? subRules : [subRules];
+
+    for (const rule of subRuleArray) {
+      if (rule["@_name"] === "Base Size" && !details.baseSize) {
+        details.baseSize = rule.description;
+      }
+    }
+  }
+
+  return details;
+}
 
 // List of all faction catalog files
 const FACTION_CATALOGS = [
@@ -81,11 +248,11 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
   // Process entryLinks
   for (const entryLink of entryLinks) {
     if (!entryLink || typeof entryLink !== 'object') continue;
-    
+
     const name = entryLink["@_name"];
     const targetId = entryLink["@_targetId"];
     const type = entryLink["@_type"];
-    
+
     if (!name || !targetId || type !== "selectionEntry") continue;
     if (name.includes("[LEGENDS]") || name.includes("Manifestation")) continue;
 
@@ -100,10 +267,15 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
       }
     }
 
+    // Try to find the referenced entry in sharedSelectionEntries to get details
+    const referencedEntry = selectionEntries.find((e: any) => e["@_id"] === targetId);
+    const details = referencedEntry ? parseUnitDetails(referencedEntry) : {};
+
     units.push({
       battlescribeId: targetId,
       name: name,
       points: points,
+      ...details,
       rawData: {
         catalogFile,
         imported: new Date().toISOString(),
@@ -114,10 +286,10 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
   // Process shared selection entries
   for (const entry of selectionEntries) {
     if (!entry || typeof entry !== 'object') continue;
-    
+
     const name = entry["@_name"];
     const id = entry["@_id"];
-    
+
     if (!name || !id) continue;
     if (name.includes("[LEGENDS]") || name.includes("Manifestation")) continue;
 
@@ -132,10 +304,14 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
       }
     }
 
+    // Parse unit details
+    const details = parseUnitDetails(entry);
+
     units.push({
       battlescribeId: id,
       name: name,
       points: points,
+      ...details,
       rawData: {
         catalogFile,
         imported: new Date().toISOString(),
@@ -198,6 +374,14 @@ async function importFactionData(supabase: any, factionData: FactionData) {
       name: unit.name,
       points: unit.points,
       unit_type: unit.unitType,
+      move: unit.move,
+      health: unit.health,
+      save: unit.save,
+      control: unit.control,
+      base_size: unit.baseSize,
+      weapons: unit.weapons || [],
+      abilities: unit.abilities || [],
+      keywords: unit.keywords || [],
       raw_data: unit.rawData,
     }));
 

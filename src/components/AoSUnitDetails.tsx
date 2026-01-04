@@ -72,27 +72,43 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
               )}
 
               {/* Basic Stats */}
-              <div className="bg-gray-700 rounded-lg p-4 mb-6">
-                <h3 className="text-lg font-semibold text-white mb-3">Grundwerte</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-gray-400 text-sm">Bewegung</div>
-                    <div className="text-white font-semibold">{unit.move}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-400 text-sm">Lebenspunkte</div>
-                    <div className="text-white font-semibold">{unit.health}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-400 text-sm">Rettungswurf</div>
-                    <div className="text-white font-semibold">{unit.save}</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-400 text-sm">Kontrolle</div>
-                    <div className="text-white font-semibold">{unit.control}</div>
+              {(unit.move || unit.health || unit.save || unit.control || unit.baseSize) && (
+                <div className="bg-gray-700 rounded-lg p-4 mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-3">Grundwerte</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {unit.move && (
+                      <div>
+                        <div className="text-gray-400 text-sm">Bewegung</div>
+                        <div className="text-white font-semibold">{unit.move}</div>
+                      </div>
+                    )}
+                    {unit.health && (
+                      <div>
+                        <div className="text-gray-400 text-sm">Lebenspunkte</div>
+                        <div className="text-white font-semibold">{unit.health}</div>
+                      </div>
+                    )}
+                    {unit.save && (
+                      <div>
+                        <div className="text-gray-400 text-sm">Rettungswurf</div>
+                        <div className="text-white font-semibold">{unit.save}</div>
+                      </div>
+                    )}
+                    {unit.control && (
+                      <div>
+                        <div className="text-gray-400 text-sm">Kontrolle</div>
+                        <div className="text-white font-semibold">{unit.control}</div>
+                      </div>
+                    )}
+                    {unit.baseSize && (
+                      <div>
+                        <div className="text-gray-400 text-sm">Base Größe</div>
+                        <div className="text-white font-semibold">{unit.baseSize}</div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Unit Size */}
               <div className="bg-gray-700 rounded-lg p-4 mb-6">
@@ -109,98 +125,114 @@ export function AoSUnitDetails({ unit, onClose, onEdit, onDelete }: AoSUnitDetai
             {/* Right Column */}
             <div>
               {/* Weapons */}
-              <div className="bg-gray-700 rounded-lg p-4 mb-6">
-                <h3 className="text-lg font-semibold text-white mb-3">Waffen</h3>
-                <div className="space-y-3">
-                  {unit.weapons.map((weapon, index) => (
-                    <div key={index} className="border border-gray-600 rounded p-3">
-                      <div className="font-semibold text-white mb-2">{weapon.name}</div>
-                      <div className="grid grid-cols-4 gap-2 text-sm">
-                        <div>
-                          <div className="text-gray-400">Reichweite</div>
-                          <div className="text-white">{weapon.range}</div>
+              {unit.weapons && unit.weapons.length > 0 && (
+                <div className="bg-gray-700 rounded-lg p-4 mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-3">Waffen</h3>
+                  <div className="space-y-3">
+                    {unit.weapons.map((weapon, index) => (
+                      <div key={index} className="border border-gray-600 rounded p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-semibold text-white">{weapon.name}</div>
+                          <div className="text-xs px-2 py-1 rounded bg-gray-600 text-gray-300">
+                            {weapon.type === 'melee' ? 'Nahkampf' : 'Fernkampf'}
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-gray-400">Angriffe</div>
-                          <div className="text-white">{weapon.attacks}</div>
-                        </div>
-                        <div>
-                          <div className="text-gray-400">Treffer</div>
-                          <div className="text-white">{weapon.hit}</div>
-                        </div>
-                        <div>
-                          <div className="text-gray-400">Verwundung</div>
-                          <div className="text-white">{weapon.wound}</div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-sm mt-2">
-                        <div>
-                          <div className="text-gray-400">Durchschlag</div>
-                          <div className="text-white">{weapon.rend || "-"}</div>
-                        </div>
-                        <div>
-                          <div className="text-gray-400">Schaden</div>
-                          <div className="text-white">{weapon.damage}</div>
-                        </div>
-                      </div>
-                      {weapon.abilities && weapon.abilities.length > 0 && (
-                        <div className="mt-2">
-                          <div className="text-gray-400 text-sm">Fähigkeiten:</div>
-                          <div className="text-white text-sm">{weapon.abilities.join(", ")}</div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Abilities */}
-              <div className="bg-gray-700 rounded-lg p-4 mb-6">
-                <h3 className="text-lg font-semibold text-white mb-3">Fähigkeiten</h3>
-                <div className="space-y-2">
-                  {unit.abilities.map((ability, index) => {
-                    const isAbilityObject = typeof ability === 'object' && ability !== null;
-                    const abilityName = isAbilityObject ? ability.name : ability;
-                    const abilityDescription = isAbilityObject ? ability.description : null;
-                    
-                    return (
-                      <div key={index} className="relative group">
-                        <div className="text-white bg-gray-600 rounded p-3 flex items-center justify-between hover:bg-gray-500 transition-colors cursor-help">
-                          <span className="font-medium">{abilityName}</span>
-                          {abilityDescription && (
-                            <Info className="w-4 h-4 text-gray-300 group-hover:text-white transition-colors" />
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                          {weapon.range && (
+                            <div>
+                              <div className="text-gray-400">Reichweite</div>
+                              <div className="text-white">{weapon.range}</div>
+                            </div>
                           )}
+                          <div>
+                            <div className="text-gray-400">Angriffe</div>
+                            <div className="text-white">{weapon.attacks || '-'}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-400">Treffer</div>
+                            <div className="text-white">{weapon.hit || '-'}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-400">Verwundung</div>
+                            <div className="text-white">{weapon.wound || '-'}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-400">Durchschlag</div>
+                            <div className="text-white">{weapon.rend || "-"}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-400">Schaden</div>
+                            <div className="text-white">{weapon.damage || '-'}</div>
+                          </div>
                         </div>
-                        
-                        {/* Tooltip */}
-                        {abilityDescription && (
-                          <div className="absolute left-0 top-full mt-2 w-80 bg-gray-900 border border-gray-600 rounded-lg p-3 text-sm text-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 shadow-xl">
-                            <div className="font-semibold text-white mb-1">{abilityName}</div>
-                            <div className="leading-relaxed">{abilityDescription}</div>
-                            {/* Arrow pointing up */}
-                            <div className="absolute -top-2 left-4 w-4 h-4 bg-gray-900 border-l border-t border-gray-600 transform rotate-45"></div>
+                        {weapon.ability && (
+                          <div className="mt-2 pt-2 border-t border-gray-600">
+                            <div className="text-gray-400 text-sm">Fähigkeit:</div>
+                            <div className="text-white text-sm">{weapon.ability}</div>
                           </div>
                         )}
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Abilities */}
+              {unit.abilities && unit.abilities.length > 0 && (
+                <div className="bg-gray-700 rounded-lg p-4 mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-3">Fähigkeiten</h3>
+                  <div className="space-y-3">
+                    {unit.abilities.map((ability, index) => (
+                      <div key={index} className="border border-gray-600 rounded p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-semibold text-white">{ability.name}</div>
+                          <div className={`text-xs px-2 py-1 rounded ${
+                            ability.type === 'passive' ? 'bg-blue-600' :
+                            ability.type === 'active' ? 'bg-green-600' :
+                            'bg-gray-600'
+                          } text-white`}>
+                            {ability.type === 'passive' ? 'Passiv' : ability.type === 'active' ? 'Aktiv' : ability.type}
+                          </div>
+                        </div>
+                        {ability.effect && (
+                          <div className="text-gray-300 text-sm leading-relaxed">{ability.effect}</div>
+                        )}
+                        {(ability.keywords || ability.color || ability.defenseType) && (
+                          <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-gray-600">
+                            {ability.keywords && (
+                              <span className="text-xs px-2 py-1 rounded bg-gray-600 text-gray-300">
+                                {ability.keywords}
+                              </span>
+                            )}
+                            {ability.defenseType && (
+                              <span className="text-xs px-2 py-1 rounded bg-purple-600 text-white">
+                                {ability.defenseType}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Keywords */}
-              <div className="bg-gray-700 rounded-lg p-4 mb-6">
-                <h3 className="text-lg font-semibold text-white mb-3">Schlüsselwörter</h3>
-                <div className="flex flex-wrap gap-2">
-                  {unit.keywords.map((keyword, index) => (
-                    <span
-                      key={index}
-                      className="bg-gray-600 text-white px-3 py-1 rounded-full text-sm"
-                    >
-                      {keyword}
-                    </span>
-                  ))}
+              {unit.keywords && unit.keywords.length > 0 && (
+                <div className="bg-gray-700 rounded-lg p-4 mb-6">
+                  <h3 className="text-lg font-semibold text-white mb-3">Schlüsselwörter</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {unit.keywords.map((keyword, index) => (
+                      <span
+                        key={index}
+                        className="bg-gray-600 text-white px-3 py-1 rounded-full text-sm"
+                      >
+                        {keyword}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
