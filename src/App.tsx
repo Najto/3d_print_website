@@ -4,15 +4,18 @@ import { AllegianceCard } from './components/AllegianceCard';
 import { AoSArmyCard } from './components/AoSArmyCard';
 import { AoSUnitCard } from './components/AoSUnitCard';
 import { AoSUnitDetails } from './components/AoSUnitDetails';
+import { AoSUnitEditor } from './components/AoSUnitEditor';
 import { SearchBar } from './components/SearchBar';
 import Settings from './components/Settings';
 import { useAoSData } from './hooks/useAoSData';
 import { AoSUnit } from './types/AoSCollection';
 
 function App() {
-  const { gameData, isLoading, reloadData } = useAoSData();
+  const { gameData, isLoading, updateUnit, reloadData } = useAoSData();
   const [selectedFactionId, setSelectedFactionId] = useState<string | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<AoSUnit | null>(null);
+  const [editingUnit, setEditingUnit] = useState<AoSUnit | null>(null);
+  const [editingArmyId, setEditingArmyId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showSettings, setShowSettings] = useState(false);
 
@@ -49,6 +52,23 @@ function App() {
 
   const handleUnitClick = (unit: AoSUnit) => {
     setSelectedUnit(unit);
+  };
+
+  const handleEditUnit = (unit: AoSUnit, armyId: string) => {
+    setEditingUnit(unit);
+    setEditingArmyId(armyId);
+    setSelectedUnit(null);
+  };
+
+  const handleSaveUnit = (unit: AoSUnit) => {
+    updateUnit(editingArmyId, unit);
+    setEditingUnit(null);
+    setEditingArmyId('');
+  };
+
+  const handleCloseEditor = () => {
+    setEditingUnit(null);
+    setEditingArmyId('');
   };
 
   if (showSettings) {
@@ -251,8 +271,23 @@ function App() {
         <AoSUnitDetails
           unit={selectedUnit}
           onClose={() => setSelectedUnit(null)}
-          onEdit={() => {}}
+          onEdit={(unit) => {
+            const armyId = selectedFactionId ||
+              gameData.armies.find(army =>
+                army.units.some(u => u.id === unit.id)
+              )?.id || '';
+            handleEditUnit(unit, armyId);
+          }}
           onDelete={() => {}}
+        />
+      )}
+
+      {editingUnit && (
+        <AoSUnitEditor
+          unit={editingUnit}
+          armyId={editingArmyId}
+          onSave={handleSaveUnit}
+          onClose={handleCloseEditor}
         />
       )}
 
