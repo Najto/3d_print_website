@@ -62,6 +62,15 @@ export interface AoSFormation {
   points?: number;
 }
 
+export interface AoSArmyTheme {
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  textureStyle: 'decay' | 'blood' | 'mist' | 'nature' | 'metal' | 'magic' | 'tribal' | 'ethereal' | 'none';
+  symbolPath?: string;
+  bannerGradient: string[];
+}
+
 export interface AoSArmy {
   id: string;
   name: string;
@@ -76,6 +85,7 @@ export interface AoSArmy {
   formations?: AoSFormation[];
   lore?: string;
   playstyle?: string;
+  theme?: AoSArmyTheme;
 }
 
 export interface AoSBattlepack {

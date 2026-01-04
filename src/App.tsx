@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sword, Search, Home, ChevronRight, Settings as SettingsIcon, Plus } from 'lucide-react';
+import { Sword, Search, Home, ChevronRight, Settings as SettingsIcon } from 'lucide-react';
 import { AllegianceCard } from './components/AllegianceCard';
 import { AoSArmyCard } from './components/AoSArmyCard';
 import { AoSUnitCard } from './components/AoSUnitCard';
@@ -7,6 +7,7 @@ import { AoSUnitDetails } from './components/AoSUnitDetails';
 import { AoSUnitEditor } from './components/AoSUnitEditor';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { SearchBar } from './components/SearchBar';
+import { ArmyPageHeader } from './components/ArmyPageHeader';
 import Settings from './components/Settings';
 import { useAoSData } from './hooks/useAoSData';
 import { AoSUnit } from './types/AoSCollection';
@@ -246,21 +247,10 @@ function App() {
 
         {!isSearchActive && selectedFaction && (
           <div>
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">{selectedFaction.name}</h2>
-                <p className="text-gray-400">
-                  {selectedFaction.units.length} {selectedFaction.units.length === 1 ? 'Einheit' : 'Einheiten'}
-                </p>
-              </div>
-              <button
-                onClick={() => handleCreateCustomUnit(selectedFaction.id)}
-                className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
-              >
-                <Plus className="w-5 h-5" />
-                <span>Custom Unit erstellen</span>
-              </button>
-            </div>
+            <ArmyPageHeader
+              army={selectedFaction}
+              onCreateCustomUnit={() => handleCreateCustomUnit(selectedFaction.id)}
+            />
 
             {selectedFaction.units.length === 0 ? (
               <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
