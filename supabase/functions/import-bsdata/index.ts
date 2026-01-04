@@ -19,6 +19,8 @@ interface UnitData {
   name: string;
   points: number;
   unitType?: string;
+  minSize?: number;
+  maxSize?: number;
   move?: string;
   health?: number;
   save?: string;
@@ -163,6 +165,49 @@ function parseNestedEntries(entry: any, details: Partial<UnitData>, depth = 0) {
   }
 }
 
+function parseUnitSizeConstraints(entry: any): { minSize?: number; maxSize?: number } {
+  const result: { minSize?: number; maxSize?: number } = {};
+
+  if (!entry || typeof entry !== 'object') return result;
+
+  const selectionEntries = entry.selectionEntries?.selectionEntry || [];
+  const selectionArray = Array.isArray(selectionEntries) ? selectionEntries : [selectionEntries];
+
+  for (const subEntry of selectionArray) {
+    if (!subEntry || typeof subEntry !== 'object') continue;
+
+    const entryType = subEntry["@_type"];
+    if (entryType !== "model") continue;
+
+    const constraints = subEntry.constraints?.constraint || [];
+    const constraintArray = Array.isArray(constraints) ? constraints : [constraints];
+
+    for (const constraint of constraintArray) {
+      if (!constraint || typeof constraint !== 'object') continue;
+
+      const constraintType = constraint["@_type"];
+      const field = constraint["@_field"];
+      const scope = constraint["@_scope"];
+      const value = constraint["@_value"];
+
+      if (field === "selections" && scope === "parent" && value) {
+        const numValue = parseInt(value);
+        if (!isNaN(numValue)) {
+          if (constraintType === "min" && !result.minSize) {
+            result.minSize = numValue;
+          } else if (constraintType === "max" && !result.maxSize) {
+            result.maxSize = numValue;
+          }
+        }
+      }
+    }
+
+    if (result.minSize || result.maxSize) break;
+  }
+
+  return result;
+}
+
 function parseUnitDetails(entry: any): Partial<UnitData> {
   const details: Partial<UnitData> = {
     weapons: [],
@@ -191,6 +236,10 @@ function parseUnitDetails(entry: any): Partial<UnitData> {
       details.baseSize = rule.description || rule["#text"];
     }
   }
+
+  const sizeConstraints = parseUnitSizeConstraints(entry);
+  if (sizeConstraints.minSize) details.minSize = sizeConstraints.minSize;
+  if (sizeConstraints.maxSize) details.maxSize = sizeConstraints.maxSize;
 
   parseNestedEntries(entry, details, 0);
 
@@ -362,6 +411,8 @@ function mergeUnitData(baseUnit: UnitData, libraryUnit: UnitData): UnitData {
     name: baseUnit.name,
     points: baseUnit.points > 0 ? baseUnit.points : libraryUnit.points,
     unitType: baseUnit.unitType || libraryUnit.unitType,
+    minSize: baseUnit.minSize || libraryUnit.minSize,
+    maxSize: baseUnit.maxSize || libraryUnit.maxSize,
     move: baseUnit.move || libraryUnit.move,
     health: baseUnit.health || libraryUnit.health,
     save: baseUnit.save || libraryUnit.save,
@@ -444,6 +495,8 @@ async function importFactionWithMerge(supabase: any, factionName: string, catalo
       name: unit.name,
       points: unit.points,
       unit_type: unit.unitType,
+      min_size: unit.minSize,
+      max_size: unit.maxSize,
       move: unit.move,
       health: unit.health,
       save: unit.save,
