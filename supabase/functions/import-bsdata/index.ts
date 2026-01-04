@@ -32,14 +32,9 @@ interface UnitData {
 
 const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/BSData/age-of-sigmar-4th/main";
 
-function parseUnitDetails(entry: any): Partial<UnitData> {
-  const details: Partial<UnitData> = {
-    weapons: [],
-    abilities: [],
-    keywords: [],
-  };
+function parseProfileFromEntry(entry: any, details: Partial<UnitData>) {
+  if (!entry || typeof entry !== 'object') return;
 
-  // Parse profiles (unit stats, weapons, abilities)
   const profiles = entry.profiles?.profile || [];
   const profileArray = Array.isArray(profiles) ? profiles : [profiles];
 
@@ -49,7 +44,6 @@ function parseUnitDetails(entry: any): Partial<UnitData> {
     const profileType = profile["@_typeName"];
     const profileName = profile["@_name"];
 
-    // Parse Unit profile (Move, Health, Save, Control)
     if (profileType === "Unit") {
       const chars = profile.characteristics?.characteristic || [];
       const charArray = Array.isArray(chars) ? chars : [chars];
@@ -58,14 +52,13 @@ function parseUnitDetails(entry: any): Partial<UnitData> {
         const name = char["@_name"];
         const value = char["#text"] || char["@_value"];
 
-        if (name === "Move") details.move = value;
-        if (name === "Health") details.health = parseInt(value) || undefined;
-        if (name === "Save") details.save = value;
-        if (name === "Control") details.control = parseInt(value) || undefined;
+        if (name === "Move" && !details.move) details.move = value;
+        if (name === "Health" && !details.health) details.health = parseInt(value) || undefined;
+        if (name === "Save" && !details.save) details.save = value;
+        if (name === "Control" && !details.control) details.control = parseInt(value) || undefined;
       }
     }
 
-    // Parse Melee Weapon
     if (profileType === "Melee Weapon") {
       const weapon: any = {
         name: profileName,
@@ -90,7 +83,6 @@ function parseUnitDetails(entry: any): Partial<UnitData> {
       details.weapons!.push(weapon);
     }
 
-    // Parse Ranged Weapon
     if (profileType === "Ranged Weapon") {
       const weapon: any = {
         name: profileName,
@@ -116,7 +108,6 @@ function parseUnitDetails(entry: any): Partial<UnitData> {
       details.weapons!.push(weapon);
     }
 
-    // Parse Ability
     if (profileType?.includes("Ability")) {
       const ability: any = {
         name: profileName,
@@ -132,25 +123,55 @@ function parseUnitDetails(entry: any): Partial<UnitData> {
 
         if (name === "Effect") ability.effect = value;
         if (name === "Keywords") ability.keywords = value;
-      }
-
-      // Parse attributes (color, type)
-      const attributes = profile.attributes?.attribute || [];
-      const attrArray = Array.isArray(attributes) ? attributes : [attributes];
-
-      for (const attr of attrArray) {
-        const name = attr["@_name"];
-        const value = attr["#text"] || attr["@_value"];
-
-        if (name === "Color") ability.color = value;
-        if (name === "Type") ability.defenseType = value;
+        if (name === "Timing") ability.timing = value;
+        if (name === "Declare") ability.declare = value;
       }
 
       details.abilities!.push(ability);
     }
   }
+}
 
-  // Parse keywords from categoryLinks
+function parseNestedEntries(entry: any, details: Partial<UnitData>, depth = 0) {
+  if (!entry || typeof entry !== 'object' || depth > 5) return;
+
+  const rules = entry.rules?.rule || [];
+  const ruleArray = Array.isArray(rules) ? rules : [rules];
+
+  for (const rule of ruleArray) {
+    if (rule["@_name"] === "Base Size" && !details.baseSize) {
+      details.baseSize = rule.description || rule["#text"];
+    }
+  }
+
+  parseProfileFromEntry(entry, details);
+
+  const selectionEntries = entry.selectionEntries?.selectionEntry || [];
+  const selectionArray = Array.isArray(selectionEntries) ? selectionEntries : [selectionEntries];
+
+  for (const subEntry of selectionArray) {
+    if (!subEntry) continue;
+    parseNestedEntries(subEntry, details, depth + 1);
+  }
+
+  const entryLinks = entry.entryLinks?.entryLink || [];
+  const entryLinkArray = Array.isArray(entryLinks) ? entryLinks : [entryLinks];
+
+  for (const link of entryLinkArray) {
+    if (!link) continue;
+    parseNestedEntries(link, details, depth + 1);
+  }
+}
+
+function parseUnitDetails(entry: any): Partial<UnitData> {
+  const details: Partial<UnitData> = {
+    weapons: [],
+    abilities: [],
+    keywords: [],
+  };
+
+  parseProfileFromEntry(entry, details);
+
   const categoryLinks = entry.categoryLinks?.categoryLink || [];
   const categoryArray = Array.isArray(categoryLinks) ? categoryLinks : [categoryLinks];
 
@@ -162,61 +183,72 @@ function parseUnitDetails(entry: any): Partial<UnitData> {
     }
   }
 
-  // Parse base size from rules
   const rules = entry.rules?.rule || [];
   const ruleArray = Array.isArray(rules) ? rules : [rules];
 
   for (const rule of ruleArray) {
     if (rule["@_name"] === "Base Size") {
-      details.baseSize = rule.description;
+      details.baseSize = rule.description || rule["#text"];
     }
   }
 
-  // Also check nested selectionEntries for base size
-  const selectionEntries = entry.selectionEntries?.selectionEntry || [];
-  const selectionArray = Array.isArray(selectionEntries) ? selectionEntries : [selectionEntries];
-
-  for (const subEntry of selectionArray) {
-    if (!subEntry) continue;
-    const subRules = subEntry.rules?.rule || [];
-    const subRuleArray = Array.isArray(subRules) ? subRules : [subRules];
-
-    for (const rule of subRuleArray) {
-      if (rule["@_name"] === "Base Size" && !details.baseSize) {
-        details.baseSize = rule.description;
-      }
-    }
-  }
+  parseNestedEntries(entry, details, 0);
 
   return details;
 }
 
-// List of all faction catalog files
 const FACTION_CATALOGS = [
   "Stormcast Eternals.cat",
+  "Stormcast Eternals - Library.cat",
   "Blades of Khorne.cat",
+  "Blades of Khorne - Library.cat",
   "Daughters of Khaine.cat",
+  "Daughters of Khaine - Library.cat",
   "Disciples of Tzeentch.cat",
+  "Disciples of Tzeentch - Library.cat",
   "Flesh-eater Courts.cat",
+  "Flesh-eater Courts - Library.cat",
   "Fyreslayers.cat",
+  "Fyreslayers - Library.cat",
   "Gloomspite Gitz.cat",
+  "Gloomspite Gitz - Library.cat",
   "Hedonites of Slaanesh.cat",
+  "Hedonites of Slaanesh - Library.cat",
   "Idoneth Deepkin.cat",
+  "Idoneth Deepkin - Library.cat",
   "Kharadron Overlords.cat",
+  "Kharadron Overlords - Library.cat",
   "Lumineth Realm-lords.cat",
+  "Lumineth Realm-lords - Library.cat",
   "Maggotkin of Nurgle.cat",
+  "Maggotkin of Nurgle - Library.cat",
   "Nighthaunt.cat",
+  "Nighthaunt - Library.cat",
   "Ogor Mawtribes.cat",
+  "Ogor Mawtribes - Library.cat",
   "Ossiarch Bonereapers.cat",
+  "Ossiarch Bonereapers - Library.cat",
   "Seraphon.cat",
+  "Seraphon - Library.cat",
   "Skaven.cat",
+  "Skaven - Library.cat",
   "Slaves to Darkness.cat",
+  "Slaves to Darkness - Library.cat",
   "Soulblight Gravelords.cat",
+  "Soulblight Gravelords - Library.cat",
   "Beasts of Chaos.cat",
+  "Beasts of Chaos - Library.cat",
   "Cities of Sigmar.cat",
+  "Cities of Sigmar - Library.cat",
   "Ironjawz.cat",
+  "Ironjawz - Library.cat",
   "Kruleboyz.cat",
+  "Kruleboyz - Library.cat",
   "Bonesplitterz.cat",
+  "Bonesplitterz - Library.cat",
+  "Sylvaneth - Library.cat",
+  "Sons of Behemat - Library.cat",
+  "Orruk Warclans - Library.cat",
 ];
 
 function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
@@ -224,28 +256,27 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
     ignoreAttributes: false,
     attributeNamePrefix: "@_",
   });
-  
+
   const parsed = parser.parse(xmlText);
   const catalogue = parsed.catalogue;
-  
+
   if (!catalogue) {
     throw new Error("Invalid catalog format");
   }
 
-  const factionName = catalogue["@_name"] || catalogFile.replace(".cat", "");
+  let factionName = catalogue["@_name"] || catalogFile.replace(".cat", "");
+  factionName = factionName.replace(" - Library", "");
+
   const units: UnitData[] = [];
 
-  // Navigate to entryLinks
   const sharedSelectionEntries = catalogue.sharedSelectionEntries?.selectionEntry || [];
   const selectionEntries = Array.isArray(sharedSelectionEntries) 
     ? sharedSelectionEntries 
     : [sharedSelectionEntries];
 
-  // Also check for entryLinks in the catalogue
   let entryLinks = catalogue.entryLinks?.entryLink || [];
   entryLinks = Array.isArray(entryLinks) ? entryLinks : [entryLinks];
 
-  // Process entryLinks
   for (const entryLink of entryLinks) {
     if (!entryLink || typeof entryLink !== 'object') continue;
 
@@ -256,7 +287,6 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
     if (!name || !targetId || type !== "selectionEntry") continue;
     if (name.includes("[LEGENDS]") || name.includes("Manifestation")) continue;
 
-    // Extract points cost
     let points = 0;
     const costs = entryLink.costs?.cost;
     if (costs) {
@@ -267,7 +297,6 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
       }
     }
 
-    // Try to find the referenced entry in sharedSelectionEntries to get details
     const referencedEntry = selectionEntries.find((e: any) => e["@_id"] === targetId);
     const details = referencedEntry ? parseUnitDetails(referencedEntry) : {};
 
@@ -283,7 +312,6 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
     });
   }
 
-  // Process shared selection entries
   for (const entry of selectionEntries) {
     if (!entry || typeof entry !== 'object') continue;
 
@@ -293,7 +321,6 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
     if (!name || !id) continue;
     if (name.includes("[LEGENDS]") || name.includes("Manifestation")) continue;
 
-    // Extract points cost
     let points = 0;
     const costs = entry.costs?.cost;
     if (costs) {
@@ -304,7 +331,6 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
       }
     }
 
-    // Parse unit details
     const details = parseUnitDetails(entry);
 
     units.push({
@@ -319,7 +345,6 @@ function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
     });
   }
 
-  // Remove duplicates based on battlescribeId
   const uniqueUnits = Array.from(
     new Map(units.map(unit => [unit.battlescribeId, unit])).values()
   );
@@ -344,27 +369,41 @@ async function fetchAndParseCatalog(catalogFile: string): Promise<FactionData> {
 }
 
 async function importFactionData(supabase: any, factionData: FactionData) {
-  // Insert or update faction
-  const { data: faction, error: factionError } = await supabase
+  let faction;
+  const { data: existingFaction } = await supabase
     .from("aos_factions")
-    .upsert(
-      {
+    .select("*")
+    .eq("name", factionData.name)
+    .maybeSingle();
+
+  if (existingFaction) {
+    const { data: updatedFaction, error: updateError } = await supabase
+      .from("aos_factions")
+      .update({
+        last_synced: new Date().toISOString(),
+      })
+      .eq("id", existingFaction.id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+    faction = updatedFaction;
+  } else {
+    const { data: newFaction, error: insertError } = await supabase
+      .from("aos_factions")
+      .insert({
         name: factionData.name,
         catalog_file: factionData.catalogFile,
         last_synced: new Date().toISOString(),
-        unit_count: factionData.units.length,
-      },
-      { onConflict: "catalog_file" }
-    )
-    .select()
-    .single();
+        unit_count: 0,
+      })
+      .select()
+      .single();
 
-  if (factionError) throw factionError;
+    if (insertError) throw insertError;
+    faction = newFaction;
+  }
 
-  // Delete existing units for this faction (to handle removed units)
-  await supabase.from("aos_units").delete().eq("faction_id", faction.id);
-
-  // Insert units in batches
   const batchSize = 50;
   for (let i = 0; i < factionData.units.length; i += batchSize) {
     const batch = factionData.units.slice(i, i + batchSize);
@@ -392,6 +431,16 @@ async function importFactionData(supabase: any, factionData: FactionData) {
     if (unitsError) throw unitsError;
   }
 
+  const { count } = await supabase
+    .from("aos_units")
+    .select("*", { count: "exact", head: true })
+    .eq("faction_id", faction.id);
+
+  await supabase
+    .from("aos_factions")
+    .update({ unit_count: count || 0 })
+    .eq("id", faction.id);
+
   return {
     factionId: faction.id,
     factionName: faction.name,
@@ -405,7 +454,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Create Supabase client with service role for database writes
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -417,7 +465,6 @@ Deno.serve(async (req: Request) => {
     let catalogsToImport: string[];
 
     if (factionParam && factionParam !== "all") {
-      // Import specific faction
       catalogsToImport = FACTION_CATALOGS.filter(
         (cat) => cat.toLowerCase().includes(factionParam.toLowerCase())
       );
@@ -429,7 +476,6 @@ Deno.serve(async (req: Request) => {
         );
       }
     } else {
-      // Import all factions
       catalogsToImport = FACTION_CATALOGS;
     }
 
@@ -450,7 +496,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Assign grand alliance to all factions after import
     console.log("Assigning grand alliances...");
     const { error: assignError } = await supabase.rpc("assign_grand_alliance");
     if (assignError) {
