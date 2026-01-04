@@ -194,52 +194,49 @@ function parseUnitDetails(entry: any): Partial<UnitData> {
 
   parseNestedEntries(entry, details, 0);
 
-  // Remove duplicate weapons based on name
   const uniqueWeapons = Array.from(
     new Map(details.weapons!.map(w => [w.name, w])).values()
   );
   details.weapons = uniqueWeapons;
 
-  // Remove duplicate abilities based on name
   const uniqueAbilities = Array.from(
     new Map(details.abilities!.map(a => [a.name, a])).values()
   );
   details.abilities = uniqueAbilities;
 
-  // Remove duplicate keywords
   details.keywords = Array.from(new Set(details.keywords));
 
   return details;
 }
 
 const FACTION_CATALOGS = [
-  "Stormcast Eternals.cat",
-  "Blades of Khorne.cat",
-  "Daughters of Khaine.cat",
-  "Disciples of Tzeentch.cat",
-  "Flesh-eater Courts.cat",
-  "Fyreslayers.cat",
-  "Gloomspite Gitz.cat",
-  "Hedonites of Slaanesh.cat",
-  "Idoneth Deepkin.cat",
-  "Kharadron Overlords.cat",
-  "Lumineth Realm-lords.cat",
-  "Maggotkin of Nurgle.cat",
-  "Nighthaunt.cat",
-  "Ogor Mawtribes.cat",
-  "Ossiarch Bonereapers.cat",
-  "Seraphon.cat",
-  "Skaven.cat",
-  "Slaves to Darkness.cat",
-  "Soulblight Gravelords.cat",
-  "Beasts of Chaos.cat",
-  "Cities of Sigmar.cat",
-  "Ironjawz.cat",
-  "Kruleboyz.cat",
-  "Bonesplitterz.cat",
-  "Sylvaneth.cat",
-  "Sons of Behemat.cat",
-  "Orruk Warclans.cat",
+  { name: "Stormcast Eternals", files: ["Stormcast Eternals.cat", "Stormcast Eternals - Library.cat"] },
+  { name: "Blades of Khorne", files: ["Blades of Khorne.cat", "Blades of Khorne - Library.cat"] },
+  { name: "Daughters of Khaine", files: ["Daughters of Khaine.cat", "Daughters of Khaine - Library.cat"] },
+  { name: "Disciples of Tzeentch", files: ["Disciples of Tzeentch.cat", "Disciples of Tzeentch - Library.cat"] },
+  { name: "Flesh-eater Courts", files: ["Flesh-eater Courts.cat", "Flesh-eater Courts - Library.cat"] },
+  { name: "Fyreslayers", files: ["Fyreslayers.cat", "Fyreslayers - Library.cat"] },
+  { name: "Gloomspite Gitz", files: ["Gloomspite Gitz.cat", "Gloomspite Gitz - Library.cat"] },
+  { name: "Hedonites of Slaanesh", files: ["Hedonites of Slaanesh.cat", "Hedonites of Slaanesh - Library.cat"] },
+  { name: "Idoneth Deepkin", files: ["Idoneth Deepkin.cat", "Idoneth Deepkin - Library.cat"] },
+  { name: "Kharadron Overlords", files: ["Kharadron Overlords.cat", "Kharadron Overlords - Library.cat"] },
+  { name: "Lumineth Realm-lords", files: ["Lumineth Realm-lords.cat", "Lumineth Realm-lords - Library.cat"] },
+  { name: "Maggotkin of Nurgle", files: ["Maggotkin of Nurgle.cat", "Maggotkin of Nurgle - Library.cat"] },
+  { name: "Nighthaunt", files: ["Nighthaunt.cat", "Nighthaunt - Library.cat"] },
+  { name: "Ogor Mawtribes", files: ["Ogor Mawtribes.cat", "Ogor Mawtribes - Library.cat"] },
+  { name: "Ossiarch Bonereapers", files: ["Ossiarch Bonereapers.cat", "Ossiarch Bonereapers - Library.cat"] },
+  { name: "Seraphon", files: ["Seraphon.cat", "Seraphon - Library.cat"] },
+  { name: "Skaven", files: ["Skaven.cat", "Skaven - Library.cat"] },
+  { name: "Slaves to Darkness", files: ["Slaves to Darkness.cat", "Slaves to Darkness - Library.cat"] },
+  { name: "Soulblight Gravelords", files: ["Soulblight Gravelords.cat", "Soulblight Gravelords - Library.cat"] },
+  { name: "Beasts of Chaos", files: ["Beasts of Chaos.cat", "Beasts of Chaos - Library.cat"] },
+  { name: "Cities of Sigmar", files: ["Cities of Sigmar.cat", "Cities of Sigmar - Library.cat"] },
+  { name: "Ironjawz", files: ["Ironjawz.cat", "Ironjawz - Library.cat"] },
+  { name: "Kruleboyz", files: ["Kruleboyz.cat", "Kruleboyz - Library.cat"] },
+  { name: "Bonesplitterz", files: ["Bonesplitterz.cat", "Bonesplitterz - Library.cat"] },
+  { name: "Sylvaneth", files: ["Sylvaneth.cat", "Sylvaneth - Library.cat"] },
+  { name: "Sons of Behemat", files: ["Sons of Behemat.cat", "Sons of Behemat - Library.cat"] },
+  { name: "Orruk Warclans", files: ["Orruk Warclans.cat", "Orruk Warclans - Library.cat"] },
 ];
 
 function parseCatalogXML(xmlText: string, catalogFile: string): FactionData {
@@ -359,12 +356,55 @@ async function fetchAndParseCatalog(catalogFile: string): Promise<FactionData> {
   return parseCatalogXML(xmlText, catalogFile);
 }
 
-async function importFactionData(supabase: any, factionData: FactionData) {
+function mergeUnitData(baseUnit: UnitData, libraryUnit: UnitData): UnitData {
+  return {
+    battlescribeId: baseUnit.battlescribeId,
+    name: baseUnit.name,
+    points: baseUnit.points > 0 ? baseUnit.points : libraryUnit.points,
+    unitType: baseUnit.unitType || libraryUnit.unitType,
+    move: baseUnit.move || libraryUnit.move,
+    health: baseUnit.health || libraryUnit.health,
+    save: baseUnit.save || libraryUnit.save,
+    control: baseUnit.control || libraryUnit.control,
+    baseSize: baseUnit.baseSize || libraryUnit.baseSize,
+    weapons: baseUnit.weapons && baseUnit.weapons.length > 0 ? baseUnit.weapons : libraryUnit.weapons,
+    abilities: baseUnit.abilities && baseUnit.abilities.length > 0 ? baseUnit.abilities : libraryUnit.abilities,
+    keywords: baseUnit.keywords && baseUnit.keywords.length > 0 ? baseUnit.keywords : libraryUnit.keywords,
+    rawData: {
+      ...libraryUnit.rawData,
+      ...baseUnit.rawData,
+      imported: new Date().toISOString(),
+    },
+  };
+}
+
+async function importFactionWithMerge(supabase: any, factionName: string, catalogFiles: string[]) {
+  const allUnits = new Map<string, UnitData>();
+
+  for (const catalogFile of catalogFiles) {
+    try {
+      const factionData = await fetchAndParseCatalog(catalogFile);
+
+      for (const unit of factionData.units) {
+        const existing = allUnits.get(unit.battlescribeId);
+        if (existing) {
+          allUnits.set(unit.battlescribeId, mergeUnitData(existing, unit));
+        } else {
+          allUnits.set(unit.battlescribeId, unit);
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to process ${catalogFile}:`, error.message);
+    }
+  }
+
+  const mergedUnits = Array.from(allUnits.values());
+
   let faction;
   const { data: existingFaction } = await supabase
     .from("aos_factions")
     .select("*")
-    .eq("name", factionData.name)
+    .eq("name", factionName)
     .maybeSingle();
 
   if (existingFaction) {
@@ -383,8 +423,8 @@ async function importFactionData(supabase: any, factionData: FactionData) {
     const { data: newFaction, error: insertError } = await supabase
       .from("aos_factions")
       .insert({
-        name: factionData.name,
-        catalog_file: factionData.catalogFile,
+        name: factionName,
+        catalog_file: catalogFiles[0],
         last_synced: new Date().toISOString(),
         unit_count: 0,
       })
@@ -396,8 +436,8 @@ async function importFactionData(supabase: any, factionData: FactionData) {
   }
 
   const batchSize = 50;
-  for (let i = 0; i < factionData.units.length; i += batchSize) {
-    const batch = factionData.units.slice(i, i + batchSize);
+  for (let i = 0; i < mergedUnits.length; i += batchSize) {
+    const batch = mergedUnits.slice(i, i + batchSize);
     const unitsToInsert = batch.map((unit) => ({
       faction_id: faction.id,
       battlescribe_id: unit.battlescribeId,
@@ -435,7 +475,7 @@ async function importFactionData(supabase: any, factionData: FactionData) {
   return {
     factionId: faction.id,
     factionName: faction.name,
-    unitCount: factionData.units.length,
+    unitCount: mergedUnits.length,
   };
 }
 
@@ -453,37 +493,39 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const factionParam = url.searchParams.get("faction");
 
-    let catalogsToImport: string[];
+    let factionsToImport: typeof FACTION_CATALOGS;
 
     if (factionParam && factionParam !== "all") {
-      catalogsToImport = FACTION_CATALOGS.filter(
-        (cat) => cat.toLowerCase().includes(factionParam.toLowerCase())
+      factionsToImport = FACTION_CATALOGS.filter(
+        (fac) => fac.name.toLowerCase().includes(factionParam.toLowerCase())
       );
 
-      if (catalogsToImport.length === 0) {
+      if (factionsToImport.length === 0) {
         return new Response(
-          JSON.stringify({ error: "Faction not found", availableFactions: FACTION_CATALOGS }),
+          JSON.stringify({
+            error: "Faction not found",
+            availableFactions: FACTION_CATALOGS.map(f => f.name)
+          }),
           { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     } else {
-      catalogsToImport = FACTION_CATALOGS;
+      factionsToImport = FACTION_CATALOGS;
     }
 
     const results = [];
     const errors = [];
 
-    for (const catalog of catalogsToImport) {
+    for (const faction of factionsToImport) {
       try {
-        console.log(`Importing ${catalog}...`);
-        const factionData = await fetchAndParseCatalog(catalog);
-        const result = await importFactionData(supabase, factionData);
+        console.log(`Importing ${faction.name}...`);
+        const result = await importFactionWithMerge(supabase, faction.name, faction.files);
         results.push(result);
         console.log(`✓ Imported ${result.factionName}: ${result.unitCount} units`);
       } catch (error) {
-        const errorMsg = `Failed to import ${catalog}: ${error.message}`;
+        const errorMsg = `Failed to import ${faction.name}: ${error.message}`;
         console.error(errorMsg);
-        errors.push({ catalog, error: error.message });
+        errors.push({ faction: faction.name, error: error.message });
       }
     }
 
@@ -491,7 +533,7 @@ Deno.serve(async (req: Request) => {
     const { error: assignError } = await supabase.rpc("assign_grand_alliance");
     if (assignError) {
       console.error("Error assigning grand alliances:", assignError);
-      errors.push({ catalog: "assign_grand_alliance", error: assignError.message });
+      errors.push({ faction: "assign_grand_alliance", error: assignError.message });
     } else {
       console.log("✓ Grand alliances assigned");
     }
@@ -500,7 +542,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         imported: results.length,
-        total: catalogsToImport.length,
+        total: factionsToImport.length,
         results,
         errors: errors.length > 0 ? errors : undefined,
       }),
