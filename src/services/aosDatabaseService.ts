@@ -231,5 +231,99 @@ export const aosDatabaseService = {
       armies: [],
       otherCategories: []
     };
+  },
+
+  async saveCustomUnitData(factionId: string, unitId: string, customData: {
+    stlFiles?: any[];
+    previewImage?: string;
+    printNotes?: string;
+    notes?: string;
+  }): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('aos_custom_unit_data')
+        .upsert({
+          faction_id: factionId,
+          unit_id: unitId,
+          user_id: null,
+          stl_files: customData.stlFiles || [],
+          preview_image: customData.previewImage || null,
+          print_notes: customData.printNotes || null,
+          notes: customData.notes || null
+        }, {
+          onConflict: 'faction_id,unit_id,user_id'
+        });
+
+      if (error) {
+        console.error('Error saving custom unit data:', error);
+        return false;
+      }
+
+      console.log('✅ Custom unit data saved to Supabase');
+      return true;
+    } catch (error) {
+      console.error('Error in saveCustomUnitData:', error);
+      return false;
+    }
+  },
+
+  async loadCustomUnitData(): Promise<Map<string, Map<string, any>>> {
+    try {
+      const { data, error } = await supabase
+        .from('aos_custom_unit_data')
+        .select('*')
+        .is('user_id', null);
+
+      if (error) {
+        console.error('Error loading custom unit data:', error);
+        return new Map();
+      }
+
+      const customDataMap = new Map<string, Map<string, any>>();
+
+      if (data) {
+        data.forEach(row => {
+          if (!customDataMap.has(row.faction_id)) {
+            customDataMap.set(row.faction_id, new Map());
+          }
+
+          customDataMap.get(row.faction_id)!.set(row.unit_id, {
+            stlFiles: row.stl_files || [],
+            previewImage: row.preview_image || '',
+            printNotes: row.print_notes || '',
+            notes: row.notes || ''
+          });
+        });
+
+        console.log(`✅ Loaded custom data for ${data.length} units from Supabase`);
+      }
+
+      return customDataMap;
+    } catch (error) {
+      console.error('Error in loadCustomUnitData:', error);
+      return new Map();
+    }
+  },
+
+  async deleteCustomUnitData(factionId: string, unitId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('aos_custom_unit_data')
+        .delete()
+        .eq('faction_id', factionId)
+        .eq('unit_id', unitId)
+        .is('user_id', null);
+
+      if (error) {
+        console.error('Error deleting custom unit data:', error);
+        return false;
+      }
+
+      console.log('✅ Custom unit data deleted from Supabase');
+      return true;
+    } catch (error) {
+      console.error('Error in deleteCustomUnitData:', error);
+      return false;
+    }
   }
 };

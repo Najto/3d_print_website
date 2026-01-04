@@ -18,38 +18,10 @@ export function useAoSData() {
       setIsLoading(true);
 
       const databaseData = await aosDatabaseService.loadArmiesFromDatabase();
+      const customDataMap = await aosDatabaseService.loadCustomUnitData();
 
-      // Try to fetch from server (optional)
-      try {
-        const response = await fetch(`${API_BASE_URL}/data`);
-        if (response.ok) {
-          const contentType = response.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            const serverData = await response.json();
-            const mergedData = mergeWithDatabaseData(databaseData, serverData);
-            setGameData(mergedData);
-            return;
-          }
-        }
-      } catch (serverError) {
-        // Server not available, continue with localStorage
-        console.log('Server not available, using localStorage');
-      }
-
-      // Fallback to localStorage
-      const savedData = localStorage.getItem(STORAGE_KEY);
-      if (savedData) {
-        try {
-          const customData = JSON.parse(savedData);
-          const mergedData = mergeWithDatabaseData(databaseData, customData);
-          setGameData(mergedData);
-        } catch (error) {
-          console.error('Error loading localStorage data:', error);
-          setGameData(databaseData);
-        }
-      } else {
-        setGameData(databaseData);
-      }
+      const mergedData = mergeWithCustomData(databaseData, customDataMap);
+      setGameData(mergedData);
     } catch (error) {
       console.error('Error loading data:', error);
       setGameData(aosDatabaseService.getEmptyGameData());
@@ -58,125 +30,68 @@ export function useAoSData() {
     }
   };
 
-  const mergeWithDatabaseData = (databaseData: AoSGameData, customData: any) => {
+  const mergeWithCustomData = (databaseData: AoSGameData, customDataMap: Map<string, Map<string, any>>) => {
     return {
       ...databaseData,
       armies: databaseData.armies.map(army => {
-        const customArmy = customData.armies?.find((a: AoSArmy) => a.id === army.id);
+        const armyCustomData = customDataMap.get(army.id);
 
-        // Enrich database units with custom properties
         const enrichedUnits = army.units.map(dbUnit => {
-          const customUnit = customArmy?.units?.find((u: AoSUnit) => u.id === dbUnit.id);
-          if (customUnit) {
-            // Merge only custom properties (STL files, images, notes)
+          const unitCustomData = armyCustomData?.get(dbUnit.id);
+          if (unitCustomData) {
             return {
               ...dbUnit,
-              stlFiles: customUnit.stlFiles || dbUnit.stlFiles,
-              previewImage: customUnit.previewImage || dbUnit.previewImage,
-              printNotes: customUnit.printNotes || dbUnit.printNotes,
-              notes: customUnit.notes || dbUnit.notes
+              stlFiles: unitCustomData.stlFiles || dbUnit.stlFiles,
+              previewImage: unitCustomData.previewImage || dbUnit.previewImage,
+              printNotes: unitCustomData.printNotes || dbUnit.printNotes,
+              notes: unitCustomData.notes || dbUnit.notes
             };
           }
           return dbUnit;
         });
-
-        // Add fully custom units (not from database)
-        const customOnlyUnits = customArmy?.units?.filter((customUnit: AoSUnit) =>
-          !army.units.some(dbUnit => dbUnit.id === customUnit.id)
-        ) || [];
 
         return {
           ...army,
-          units: [...enrichedUnits, ...customOnlyUnits]
+          units: enrichedUnits
         };
       }),
       otherCategories: databaseData.otherCategories?.map(category => {
-        const customCategory = customData.otherCategories?.find((c: AoSArmy) => c.id === category.id);
+        const categoryCustomData = customDataMap.get(category.id);
 
-        // Enrich database units with custom properties
         const enrichedUnits = category.units.map(dbUnit => {
-          const customUnit = customCategory?.units?.find((u: AoSUnit) => u.id === dbUnit.id);
-          if (customUnit) {
-            // Merge only custom properties
+          const unitCustomData = categoryCustomData?.get(dbUnit.id);
+          if (unitCustomData) {
             return {
               ...dbUnit,
-              stlFiles: customUnit.stlFiles || dbUnit.stlFiles,
-              previewImage: customUnit.previewImage || dbUnit.previewImage,
-              printNotes: customUnit.printNotes || dbUnit.printNotes,
-              notes: customUnit.notes || dbUnit.notes
+              stlFiles: unitCustomData.stlFiles || dbUnit.stlFiles,
+              previewImage: unitCustomData.previewImage || dbUnit.previewImage,
+              printNotes: unitCustomData.printNotes || dbUnit.printNotes,
+              notes: unitCustomData.notes || dbUnit.notes
             };
           }
           return dbUnit;
         });
 
-        // Add fully custom units (not from database)
-        const customOnlyUnits = customCategory?.units?.filter((customUnit: AoSUnit) =>
-          !category.units.some(dbUnit => dbUnit.id === customUnit.id)
-        ) || [];
-
         return {
           ...category,
-          units: [...enrichedUnits, ...customOnlyUnits]
+          units: enrichedUnits
         };
       }) || []
     };
   };
 
-  // Save custom data to both server and localStorage
-  const saveCustomData = async (data: AoSGameData) => {
-    const customData = {
-      armies: data.armies.map(army => ({
-        id: army.id,
-        units: army.units
-          .filter(unit => unit.stlFiles?.length || unit.previewImage || unit.printNotes || unit.notes)
-          .map(unit => ({
-            id: unit.id,
-            stlFiles: unit.stlFiles,
-            previewImage: unit.previewImage,
-            printNotes: unit.printNotes,
-            notes: unit.notes
-          }))
-      })),
-      otherCategories: data.otherCategories?.map(category => ({
-        id: category.id,
-        units: category.units
-          .filter(unit => unit.stlFiles?.length || unit.previewImage || unit.printNotes || unit.notes)
-          .map(unit => ({
-            id: unit.id,
-            stlFiles: unit.stlFiles,
-            previewImage: unit.previewImage,
-            printNotes: unit.printNotes,
-            notes: unit.notes
-          }))
-      })) || []
-    };
-
-    // Save to server
+  const saveCustomData = async (factionId: string, unit: AoSUnit) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/data`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(customData),
-      });
+      const customData = {
+        stlFiles: unit.stlFiles,
+        previewImage: unit.previewImage,
+        printNotes: unit.printNotes,
+        notes: unit.notes
+      };
 
-      if (response.ok) {
-        console.log('✅ Data saved to server');
-      } else {
-        throw new Error('Server save failed');
-      }
+      await aosDatabaseService.saveCustomUnitData(factionId, unit.id, customData);
     } catch (error) {
-      console.error('❌ Failed to save to server:', error);
-      // Fallback to localStorage if server fails
-    }
-
-    // Always save to localStorage as backup
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(customData));
-      console.log('✅ Data saved to localStorage (backup)');
-    } catch (error) {
-      console.error('Error saving to localStorage:', error);
+      console.error('Error saving custom data:', error);
     }
   };
 
@@ -187,17 +102,15 @@ export function useAoSData() {
         if (army.id === armyId) {
           const existingUnitIndex = army.units.findIndex(u => u.id === unit.id);
           let newUnits;
-          
+
           if (existingUnitIndex >= 0) {
-            // Update existing unit
-            newUnits = army.units.map((u, index) => 
+            newUnits = army.units.map((u, index) =>
               index === existingUnitIndex ? unit : u
             );
           } else {
-            // Add new unit
             newUnits = [...army.units, unit];
           }
-          
+
           return {
             ...army,
             units: newUnits
@@ -209,17 +122,15 @@ export function useAoSData() {
         if (category.id === armyId) {
           const existingUnitIndex = category.units.findIndex(u => u.id === unit.id);
           let newUnits;
-          
+
           if (existingUnitIndex >= 0) {
-            // Update existing unit
-            newUnits = category.units.map((u, index) => 
+            newUnits = category.units.map((u, index) =>
               index === existingUnitIndex ? unit : u
             );
           } else {
-            // Add new unit
             newUnits = [...category.units, unit];
           }
-          
+
           return {
             ...category,
             units: newUnits
@@ -228,12 +139,12 @@ export function useAoSData() {
         return category;
       }) || []
     };
-    
+
     setGameData(newGameData);
-    saveCustomData(newGameData);
+    saveCustomData(armyId, unit);
   };
 
-  const deleteUnit = (armyId: string, unitId: string) => {
+  const deleteUnit = async (armyId: string, unitId: string) => {
     const newGameData = {
       ...gameData,
       armies: gameData.armies.map(army => {
@@ -255,20 +166,13 @@ export function useAoSData() {
         return category;
       }) || []
     };
-    
+
     setGameData(newGameData);
-    saveCustomData(newGameData);
+    await aosDatabaseService.deleteCustomUnitData(armyId, unitId);
   };
 
   const resetToDefault = async () => {
     localStorage.removeItem(STORAGE_KEY);
-    // Also clear server data
-    try {
-      await fetch(`${API_BASE_URL}/data`, { method: 'DELETE' });
-    } catch (error) {
-      console.error('Failed to clear server data:', error);
-    }
-    // Reload from database
     await loadData();
   };
 
@@ -297,17 +201,16 @@ export function useAoSData() {
     }
     return { allNewUnits: {}, totalNewUnits: 0, scannedArmies: 0, summary: [] };
   };
-  const addScannedUnits = (armyId: string, newUnits: AoSUnit[]) => {
+  const addScannedUnits = async (armyId: string, newUnits: AoSUnit[]) => {
     if (newUnits.length === 0) return;
-    
+
     const newGameData = {
       ...gameData,
       armies: gameData.armies.map(army => {
         if (army.id === armyId) {
-          // Filter out units that already exist
           const existingUnitIds = army.units.map(u => u.id);
           const unitsToAdd = newUnits.filter(unit => !existingUnitIds.includes(unit.id));
-          
+
           return {
             ...army,
             units: [...army.units, ...unitsToAdd]
@@ -317,10 +220,9 @@ export function useAoSData() {
       }),
       otherCategories: gameData.otherCategories?.map(category => {
         if (category.id === armyId) {
-          // Filter out units that already exist
           const existingUnitIds = category.units.map(u => u.id);
           const unitsToAdd = newUnits.filter(unit => !existingUnitIds.includes(unit.id));
-          
+
           return {
             ...category,
             units: [...category.units, ...unitsToAdd]
@@ -329,24 +231,25 @@ export function useAoSData() {
         return category;
       }) || []
     };
-    
+
     setGameData(newGameData);
-    saveCustomData(newGameData);
+
+    for (const unit of newUnits) {
+      await saveCustomData(armyId, unit);
+    }
   };
 
-  const addAllScannedUnits = (allNewUnits: { [armyId: string]: AoSUnit[] }) => {
+  const addAllScannedUnits = async (allNewUnits: { [armyId: string]: AoSUnit[] }) => {
     let newGameData = { ...gameData };
-    
-    // Process each army's new units
+
     Object.entries(allNewUnits).forEach(([armyId, newUnits]) => {
       if (newUnits.length === 0) return;
-      
-      // Update armies
+
       newGameData.armies = newGameData.armies.map(army => {
         if (army.id === armyId) {
           const existingUnitIds = army.units.map(u => u.id);
           const unitsToAdd = newUnits.filter(unit => !existingUnitIds.includes(unit.id));
-          
+
           return {
             ...army,
             units: [...army.units, ...unitsToAdd]
@@ -354,13 +257,12 @@ export function useAoSData() {
         }
         return army;
       });
-      
-      // Update other categories
+
       newGameData.otherCategories = newGameData.otherCategories?.map(category => {
         if (category.id === armyId) {
           const existingUnitIds = category.units.map(u => u.id);
           const unitsToAdd = newUnits.filter(unit => !existingUnitIds.includes(unit.id));
-          
+
           return {
             ...category,
             units: [...category.units, ...unitsToAdd]
@@ -369,9 +271,14 @@ export function useAoSData() {
         return category;
       }) || [];
     });
-    
+
     setGameData(newGameData);
-    saveCustomData(newGameData);
+
+    for (const [armyId, newUnits] of Object.entries(allNewUnits)) {
+      for (const unit of newUnits) {
+        await saveCustomData(armyId, unit);
+      }
+    }
   };
   return {
     gameData,
