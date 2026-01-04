@@ -302,7 +302,7 @@ function App() {
         />
       )}
 
-      {editingUnit && (
+      {editingArmyId && (
         <AoSUnitEditor
           unit={editingUnit}
           armyId={editingArmyId}
