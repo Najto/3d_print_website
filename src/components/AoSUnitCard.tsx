@@ -114,7 +114,7 @@ export function AoSUnitCard({ unit, onViewDetails, onEdit, onDelete }: AoSUnitCa
         )}
 
         {/* Weapons Preview */}
-        {unit.weapons && unit.weapons.length > 0 && (
+        {/*unit.weapons && unit.weapons.length > 0 && (
           <div className="mb-4">
             <h4 className="text-sm font-semibold text-gray-300 mb-2">Waffen:</h4>
             <div className="space-y-1">
@@ -133,7 +133,7 @@ export function AoSUnitCard({ unit, onViewDetails, onEdit, onDelete }: AoSUnitCa
               )}
             </div>
           </div>
-        )}
+        )*/s}
 
         {/* STL Files Info */}
         {unit.stlFiles && unit.stlFiles.length > 0 && (
