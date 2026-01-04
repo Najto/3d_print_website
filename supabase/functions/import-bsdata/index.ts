@@ -266,6 +266,16 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Assign grand alliance to all factions after import
+    console.log("Assigning grand alliances...");
+    const { error: assignError } = await supabase.rpc("assign_grand_alliance");
+    if (assignError) {
+      console.error("Error assigning grand alliances:", assignError);
+      errors.push({ catalog: "assign_grand_alliance", error: assignError.message });
+    } else {
+      console.log("✓ Grand alliances assigned");
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

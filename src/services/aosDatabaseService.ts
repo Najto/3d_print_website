@@ -84,6 +84,14 @@ export const aosDatabaseService = {
       console.log(`📊 Loaded ${factions.length} factions from database`);
       console.log(`📊 Loaded ${units?.length || 0} units from database`);
 
+      // Log grand alliances for debugging
+      const allianceCounts = new Map<string, number>();
+      factions.forEach(f => {
+        const alliance = f.grand_alliance || 'NONE';
+        allianceCounts.set(alliance, (allianceCounts.get(alliance) || 0) + 1);
+      });
+      console.log('🏰 Grand Alliance distribution:', Object.fromEntries(allianceCounts));
+
       // Group units by faction_id for efficient lookup
       const unitsByFaction = new Map<string, DbUnit[]>();
       if (units) {
@@ -102,6 +110,9 @@ export const aosDatabaseService = {
 
       // Generate allegiance groups dynamically from factions
       const allegianceGroups = this.generateAllegianceGroups(factions, armies);
+
+      console.log('✅ Generated allegiance groups:', Object.keys(allegianceGroups));
+      console.log('📦 Armies per alliance:', Object.entries(allegianceGroups).map(([key, group]) => `${group.name}: ${group.armies.length}`));
 
       return {
         edition: "4th Edition",
