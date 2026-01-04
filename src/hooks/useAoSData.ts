@@ -54,45 +54,61 @@ export function useAoSData() {
       ...databaseData,
       armies: databaseData.armies.map(army => {
         const customArmy = customData.armies?.find((a: AoSArmy) => a.id === army.id);
-        if (customArmy && customArmy.units && customArmy.units.length > 0) {
-          const mergedUnits = [...army.units];
 
-          customArmy.units.forEach((customUnit: AoSUnit) => {
-            const existingIndex = mergedUnits.findIndex(u => u.id === customUnit.id);
-            if (existingIndex >= 0) {
-              mergedUnits[existingIndex] = customUnit;
-            } else {
-              mergedUnits.push(customUnit);
-            }
-          });
+        // Enrich database units with custom properties
+        const enrichedUnits = army.units.map(dbUnit => {
+          const customUnit = customArmy?.units?.find((u: AoSUnit) => u.id === dbUnit.id);
+          if (customUnit) {
+            // Merge only custom properties (STL files, images, notes)
+            return {
+              ...dbUnit,
+              stlFiles: customUnit.stlFiles || dbUnit.stlFiles,
+              previewImage: customUnit.previewImage || dbUnit.previewImage,
+              printNotes: customUnit.printNotes || dbUnit.printNotes,
+              notes: customUnit.notes || dbUnit.notes
+            };
+          }
+          return dbUnit;
+        });
 
-          return {
-            ...army,
-            units: mergedUnits
-          };
-        }
-        return army;
+        // Add fully custom units (not from database)
+        const customOnlyUnits = customArmy?.units?.filter((customUnit: AoSUnit) =>
+          !army.units.some(dbUnit => dbUnit.id === customUnit.id)
+        ) || [];
+
+        return {
+          ...army,
+          units: [...enrichedUnits, ...customOnlyUnits]
+        };
       }),
       otherCategories: databaseData.otherCategories?.map(category => {
         const customCategory = customData.otherCategories?.find((c: AoSArmy) => c.id === category.id);
-        if (customCategory && customCategory.units && customCategory.units.length > 0) {
-          const mergedUnits = [...category.units];
 
-          customCategory.units.forEach((customUnit: AoSUnit) => {
-            const existingIndex = mergedUnits.findIndex(u => u.id === customUnit.id);
-            if (existingIndex >= 0) {
-              mergedUnits[existingIndex] = customUnit;
-            } else {
-              mergedUnits.push(customUnit);
-            }
-          });
+        // Enrich database units with custom properties
+        const enrichedUnits = category.units.map(dbUnit => {
+          const customUnit = customCategory?.units?.find((u: AoSUnit) => u.id === dbUnit.id);
+          if (customUnit) {
+            // Merge only custom properties
+            return {
+              ...dbUnit,
+              stlFiles: customUnit.stlFiles || dbUnit.stlFiles,
+              previewImage: customUnit.previewImage || dbUnit.previewImage,
+              printNotes: customUnit.printNotes || dbUnit.printNotes,
+              notes: customUnit.notes || dbUnit.notes
+            };
+          }
+          return dbUnit;
+        });
 
-          return {
-            ...category,
-            units: mergedUnits
-          };
-        }
-        return category;
+        // Add fully custom units (not from database)
+        const customOnlyUnits = customCategory?.units?.filter((customUnit: AoSUnit) =>
+          !category.units.some(dbUnit => dbUnit.id === customUnit.id)
+        ) || [];
+
+        return {
+          ...category,
+          units: [...enrichedUnits, ...customOnlyUnits]
+        };
       }) || []
     };
   };
@@ -103,10 +119,26 @@ export function useAoSData() {
       armies: data.armies.map(army => ({
         id: army.id,
         units: army.units
+          .filter(unit => unit.stlFiles?.length || unit.previewImage || unit.printNotes || unit.notes)
+          .map(unit => ({
+            id: unit.id,
+            stlFiles: unit.stlFiles,
+            previewImage: unit.previewImage,
+            printNotes: unit.printNotes,
+            notes: unit.notes
+          }))
       })),
       otherCategories: data.otherCategories?.map(category => ({
         id: category.id,
         units: category.units
+          .filter(unit => unit.stlFiles?.length || unit.previewImage || unit.printNotes || unit.notes)
+          .map(unit => ({
+            id: unit.id,
+            stlFiles: unit.stlFiles,
+            previewImage: unit.previewImage,
+            printNotes: unit.printNotes,
+            notes: unit.notes
+          }))
       })) || []
     };
 
@@ -219,11 +251,16 @@ export function useAoSData() {
     saveCustomData(newGameData);
   };
 
-  const resetToDefault = () => {
+  const resetToDefault = async () => {
     localStorage.removeItem(STORAGE_KEY);
     // Also clear server data
-    fetch(`${API_BASE_URL}/data`, { method: 'DELETE' }).catch(console.error);
-    setGameData(initialData);
+    try {
+      await fetch(`${API_BASE_URL}/data`, { method: 'DELETE' });
+    } catch (error) {
+      console.error('Failed to clear server data:', error);
+    }
+    // Reload from database
+    await loadData();
   };
 
   const scanFoldersForNewUnits = async (armyId: string) => {

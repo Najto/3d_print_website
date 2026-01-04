@@ -68,10 +68,21 @@ export const aosDatabaseService = {
         }
       });
 
+      console.log(`📊 Loaded ${units?.length || 0} units from database`);
+      console.log(`📊 Mapped ${factionIdToArmyId.size} factions to armies`);
+
+      const unmappedFactions = new Set<string>();
+
       if (units && units.length > 0) {
         units.forEach(unit => {
           const armyId = factionIdToArmyId.get(unit.faction_id);
-          if (!armyId) return;
+          if (!armyId) {
+            const faction = factions.find(f => f.id === unit.faction_id);
+            if (faction) {
+              unmappedFactions.add(faction.name);
+            }
+            return;
+          }
 
           const army = armiesMap.get(armyId);
           if (!army) return;
@@ -79,28 +90,36 @@ export const aosDatabaseService = {
           const unitType = unit.unit_type || '';
           const keywords = unitType ? [unitType] : [];
 
+          const unitSize = unit.min_size
+            ? (unit.max_size && unit.max_size !== unit.min_size
+                ? `${unit.min_size}-${unit.max_size}`
+                : `${unit.min_size}`)
+            : '1';
+
           const aosUnit: AoSUnit = {
             id: unit.battlescribe_id,
             name: unit.name,
             points: unit.points,
+            move: '6"',
+            health: 1,
+            save: '4+',
+            control: 1,
+            unitSize,
             keywords,
             weapons: [],
             abilities: [{
               name: 'Offizielle Daten',
-              description: `Diese Unit wurde aus den offiziellen BSData importiert. Punkte: ${unit.points}${unit.min_size ? `, Größe: ${unit.min_size}${unit.max_size && unit.max_size !== unit.min_size ? `-${unit.max_size}` : ''}` : ''}`
+              description: `Diese Unit wurde aus den offiziellen BSData importiert. Punkte: ${unit.points}${unit.min_size ? `, Größe: ${unitSize}` : ''}`
             }],
-            stats: {
-              move: 0,
-              health: 0,
-              save: 0,
-              control: 0
-            },
-            imagePath: '',
             stlFiles: []
           };
 
           army.units.push(aosUnit);
         });
+      }
+
+      if (unmappedFactions.size > 0) {
+        console.warn('⚠️ Unmapped factions:', Array.from(unmappedFactions).join(', '));
       }
 
       const updatedArmies = initialData.armies.map(army => {
