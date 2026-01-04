@@ -71,9 +71,8 @@ export function AoSArmyCard({ army, onClick }: AoSArmyCardProps) {
       {army.playstyle && (
         <div className="text-xs text-gray-400 italic">
           🎯 {army.playstyle}
-        </div>
+        </div>{*/}
       )}
     </div>
-    {*/}
   );
 }
