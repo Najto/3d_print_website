@@ -133,7 +133,7 @@ export function AoSUnitCard({ unit, onViewDetails, onEdit, onDelete }: AoSUnitCa
               )}
             </div>
           </div>
-        )*/s}
+        )*/}
 
         {/* STL Files Info */}
         {unit.stlFiles && unit.stlFiles.length > 0 && (
