@@ -240,22 +240,42 @@ export const aosDatabaseService = {
     notes?: string;
   }): Promise<boolean> {
     try {
-      const { data, error } = await supabase
+      const { data: existing } = await supabase
         .from('aos_custom_unit_data')
-        .upsert({
-          faction_id: factionId,
-          unit_id: unitId,
-          user_id: null,
-          stl_files: customData.stlFiles || [],
-          preview_image: customData.previewImage || null,
-          print_notes: customData.printNotes || null,
-          notes: customData.notes || null
-        }, {
-          onConflict: 'faction_id,unit_id,user_id'
-        });
+        .select('id')
+        .eq('faction_id', factionId)
+        .eq('unit_id', unitId)
+        .is('user_id', null)
+        .maybeSingle();
 
-      if (error) {
-        console.error('Error saving custom unit data:', error);
+      let result;
+      if (existing) {
+        result = await supabase
+          .from('aos_custom_unit_data')
+          .update({
+            stl_files: customData.stlFiles || [],
+            preview_image: customData.previewImage || null,
+            print_notes: customData.printNotes || null,
+            notes: customData.notes || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+      } else {
+        result = await supabase
+          .from('aos_custom_unit_data')
+          .insert({
+            faction_id: factionId,
+            unit_id: unitId,
+            user_id: null,
+            stl_files: customData.stlFiles || [],
+            preview_image: customData.previewImage || null,
+            print_notes: customData.printNotes || null,
+            notes: customData.notes || null
+          });
+      }
+
+      if (result.error) {
+        console.error('Error saving custom unit data:', result.error);
         return false;
       }
 

@@ -69,25 +69,14 @@ export function AoSUnitEditor({ unit, armyId, onSave, onClose }: AoSUnitEditorPr
 
   const loadExistingFiles = async () => {
     if (!unit || !unit.name) return;
-    
+
     setLoadingFiles(true);
     try {
-      const filesData = await fileService.getFiles(allegiance, armyId, unit.name);
-      if (filesData.exists) {
-        // Update form data with existing files
-        const previewFile = filesData.files.find(f => f.isPreview);
-        const stlFiles = filesData.files.filter(f => !f.isPreview);
-        
-        setFormData(prev => ({
-          ...prev,
-          previewImage: previewFile?.path || '',
-          stlFiles: stlFiles.map(f => ({
-            name: f.name,
-            size: f.size,
-            path: f.path
-          }))
-        }));
-      }
+      setFormData(prev => ({
+        ...prev,
+        previewImage: unit.previewImage || '',
+        stlFiles: unit.stlFiles || []
+      }));
     } catch (error) {
       console.error('Error loading files:', error);
     } finally {
