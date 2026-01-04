@@ -8,9 +8,11 @@ import { AoSUnitEditor } from './components/AoSUnitEditor';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { SearchBar } from './components/SearchBar';
 import { ArmyPageHeader } from './components/ArmyPageHeader';
+import { UnitTypeFilter, filterUnitsByType, UnitType } from './components/UnitTypeFilter';
 import Settings from './components/Settings';
 import { useAoSData } from './hooks/useAoSData';
 import { AoSUnit } from './types/AoSCollection';
+import { getFactionTheme } from './utils/factionThemes';
 
 function App() {
   const { gameData, isLoading, updateUnit, deleteUnit, reloadData } = useAoSData();
@@ -22,6 +24,7 @@ function App() {
   const [deletingArmyId, setDeletingArmyId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [selectedUnitType, setSelectedUnitType] = useState<UnitType>('ALLE');
 
   const selectedFaction = selectedFactionId
     ? gameData.armies.find(army => army.id === selectedFactionId)
@@ -46,6 +49,7 @@ function App() {
 
   const handleFactionClick = (factionId: string) => {
     setSelectedFactionId(factionId);
+    setSelectedUnitType('ALLE');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -252,28 +256,43 @@ function App() {
               onCreateCustomUnit={() => handleCreateCustomUnit(selectedFaction.id)}
             />
 
+            <UnitTypeFilter
+              units={selectedFaction.units}
+              selectedType={selectedUnitType}
+              onTypeChange={setSelectedUnitType}
+              theme={selectedFaction.theme || getFactionTheme(selectedFaction.name)}
+            />
+
             {selectedFaction.units.length === 0 ? (
               <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
                 <p className="text-gray-400 text-lg">Keine Einheiten für diese Fraktion verfügbar.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {[...selectedFaction.units]
-                  .sort((a, b) => {
-                    if (a.isCustom && !b.isCustom) return 1;
-                    if (!a.isCustom && b.isCustom) return -1;
-                    return 0;
-                  })
-                  .map((unit) => (
-                    <AoSUnitCard
-                      key={unit.id}
-                      unit={unit}
-                      onViewDetails={handleUnitClick}
-                      onEdit={() => handleEditUnit(unit, selectedFaction.id)}
-                      onDelete={() => handleDeleteUnit(unit, selectedFaction.id)}
-                    />
-                  ))}
-              </div>
+              <>
+                {filterUnitsByType(selectedFaction.units, selectedUnitType).length === 0 ? (
+                  <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
+                    <p className="text-gray-400 text-lg">Keine Einheiten für diesen Typ verfügbar.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filterUnitsByType(selectedFaction.units, selectedUnitType)
+                      .sort((a, b) => {
+                        if (a.isCustom && !b.isCustom) return 1;
+                        if (!a.isCustom && b.isCustom) return -1;
+                        return 0;
+                      })
+                      .map((unit) => (
+                        <AoSUnitCard
+                          key={unit.id}
+                          unit={unit}
+                          onViewDetails={handleUnitClick}
+                          onEdit={() => handleEditUnit(unit, selectedFaction.id)}
+                          onDelete={() => handleDeleteUnit(unit, selectedFaction.id)}
+                        />
+                      ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
