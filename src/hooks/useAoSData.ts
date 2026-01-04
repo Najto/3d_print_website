@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { AoSGameData, AoSUnit, AoSArmy } from '../types/AoSCollection';
-import { aosGameData as initialData } from '../data/aosData';
 import { aosDatabaseService } from '../services/aosDatabaseService';
 
 const STORAGE_KEY = 'aos_custom_data';
 const API_BASE_URL = '/api';
 
 export function useAoSData() {
-  const [gameData, setGameData] = useState<AoSGameData>(initialData);
+  const [gameData, setGameData] = useState<AoSGameData>(aosDatabaseService.getEmptyGameData());
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -43,7 +42,7 @@ export function useAoSData() {
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      setGameData(initialData);
+      setGameData(aosDatabaseService.getEmptyGameData());
     } finally {
       setIsLoading(false);
     }
